@@ -1,0 +1,12 @@
+{
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@fastify/multipart": "latest",
+    "@fastify/static": "latest",
+    "fastify": "latest",
+    "sharp": "latest"
+  },
+  "devDependencies": {}
+}
