@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>时间线 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">MUSEUM TIMELINE</p>
+        <h1>时间线</h1>
+        <span class="section-tag">按日期浏览 / 混合展示 / 按类型筛选</span>
+      </div>
+      <p class="hero-text">按入馆时间混合展示照片、视频、音频和生活日志，快速回到某一天留下的垃圾现场。</p>
+      <div class="page-actions">
+        <select id="timeline-filter" class="pixel-input" aria-label="按类型筛选">
+          <option value="全部">全部藏品</option>
+          <option value="电子垃圾">电子垃圾</option>
+          <option value="现实垃圾">现实垃圾</option>
+          <option value="生活日志">生活日志</option>
+          <option value="videos">影像碎片</option>
+          <option value="photos">视觉残片</option>
+          <option value="audios">声音碎片</option>
+        </select>
+      </div>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card">
+        <div class="timeline-list" id="timeline-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>

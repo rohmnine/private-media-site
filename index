@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>像素媒体库</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="page-shell">
+    <header class="hero-panel pixel-card">
+      <div class="hero-copy">
+        <p class="eyebrow">PRIVATE MEDIA HUB</p>
+        <h1>像素媒体库</h1>
+        <p class="hero-text">
+          你的私人视频 / 照片 / 音频收纳站。支持手机、平板、电脑响应式访问。
+        </p>
+        <div class="hero-actions">
+          <a href="#videos" class="pixel-button">查看视频</a>
+          <a href="#photos" class="pixel-button secondary">浏览照片</a>
+          <a href="#audio" class="pixel-button tertiary">收听音频</a>
+        </div>
+      </div>
+      <div class="hero-stats">
+        <div class="pixel-card stat-box">
+          <span class="stat-label">设备适配</span>
+          <strong>手机 / 平板 / 电脑</strong>
+        </div>
+        <div class="pixel-card stat-box">
+          <span class="stat-label">风格</span>
+          <strong>复古像素 UI</strong>
+        </div>
+        <div class="pixel-card stat-box">
+          <span class="stat-label">媒体类型</span>
+          <strong>视频 / 照片 / 音频</strong>
+        </div>
+      </div>
+    </header>
+
+    <main class="content-grid">
+      <aside class="sidebar pixel-card">
+        <h2>媒体导航</h2>
+        <nav>
+          <a href="#videos">视频展柜</a>
+          <a href="#photos">照片画廊</a>
+          <a href="#audio">音频随身听</a>
+          <a href="#tips">使用说明</a>
+        </nav>
+      </aside>
+
+      <section class="main-content">
+        <section id="videos" class="media-section pixel-card">
+          <div class="section-heading">
+            <h2>视频展柜</h2>
+            <span class="section-tag">Video</span>
+          </div>
+
+          <div class="upload-panel">
+            <label for="video-upload" class="pixel-button upload-btn">上传视频到本页预览</label>
+            <input id="video-upload" type="file" accept="video/*" multiple />
+            <p class="upload-tip">已放到 assets/video 的文件会自动显示；你也可以临时上传本地视频立即预览。</p>
+          </div>
+
+          <div class="media-list" id="video-list"></div>
+        </section>
+
+        <section id="photos" class="media-section pixel-card">
+          <div class="section-heading">
+            <h2>照片画廊</h2>
+            <span class="section-tag">Photo</span>
+          </div>
+
+          <div class="upload-panel">
+            <label for="photo-upload" class="pixel-button upload-btn secondary">上传照片到本页预览</label>
+            <input id="photo-upload" type="file" accept="image/*" multiple />
+            <p class="upload-tip">已放到 assets/photos 的图片会自动显示；你也可以临时上传本地图片立即预览。</p>
+          </div>
+
+          <div class="photo-wall" id="photo-list"></div>
+        </section>
+
+        <section id="audio" class="media-section pixel-card">
+          <div class="section-heading">
+            <h2>音频随身听</h2>
+            <span class="section-tag">Audio</span>
+          </div>
+          <div class="audio-list" id="audio-list"></div>
+        </section>
+
+        <section id="tips" class="media-section pixel-card tips-panel">
+          <div class="section-heading">
+            <h2>使用说明</h2>
+            <span class="section-tag">Guide</span>
+          </div>
+          <ol>
+            <li>你放在 <code>assets/video</code> 和 <code>assets/photos</code> 的文件会直接展示在对应分区。</li>
+            <li>上传按钮为“本地临时预览”，刷新页面后会消失，不会自动写入硬盘目录。</li>
+            <li>如果要长期保留，请继续把文件复制到 <code>assets</code> 目录并在 <code>scripts.js</code> 里维护清单。</li>
+          </ol>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+node_modules/
+npm-debug.log*
+.env
+.git/
+.idea/
+.omc/
+assets/
+data/
+trash/
+thumbnails/
+*.log
+.DS_Store

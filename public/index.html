@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="hero-panel pixel-card">
+      <div class="hero-copy">
+        <p class="eyebrow">MY TRASH MUSEUM // PIXEL ARCHIVE</p>
+        <h1>我的垃圾博物馆</h1>
+        <p class="hero-text">
+          把照片、视频、音频和生活日志登记成私人藏品。这里展示馆藏统计、最近入馆、镇馆之宝和全局搜索，每一件垃圾都有编号、展区和来历。
+        </p>
+        <div class="hero-actions">
+          <a href="photos.html?manage=1" class="pixel-button">入馆登记</a>
+          <a href="timeline.html" class="pixel-button tertiary">查看时间线</a>
+          <a href="logs.html" class="pixel-button secondary">馆藏日志</a>
+          <a href="trash.html?manage=1" class="pixel-button secondary">馆长后台</a>
+        </div>
+      </div>
+      <div class="hero-console" aria-label="博物馆状态面板">
+        <div class="console-screen">
+          <span class="pixel-dot"></span>
+          <strong>MUSEUM SYSTEM READY</strong>
+          <p>电子垃圾 / 现实垃圾 / 生活日志</p>
+        </div>
+        <div class="stat-grid" id="home-stats-panel">
+          <div class="stat-box pixel-card"><span>影像碎片</span><strong>2+</strong><em>清点中</em></div>
+          <div class="stat-box pixel-card"><span>视觉残片</span><strong>4+</strong><em>清点中</em></div>
+          <div class="stat-box pixel-card"><span>声音碎片</span><strong>2+</strong><em>清点中</em></div>
+          <div class="stat-box pixel-card"><span>馆藏日志</span><strong>3</strong><em>清点中</em></div>
+        </div>
+      </div>
+    </header>
+
+    <nav class="quick-nav pixel-card" aria-label="主导航">
+      <a href="photos.html">▧ 视觉残片</a>
+      <a href="videos.html">▶ 影像碎片</a>
+      <a href="audio.html">♫ 声音碎片</a>
+      <a href="timeline.html">⌁ 时间线</a>
+      <a href="tags.html"># 标签</a>
+      <a href="logs.html">✎ 馆藏日志</a>
+      <a href="trash.html?manage=1">× 废弃区</a>
+    </nav>
+
+    <section class="global-search pixel-card" aria-label="全局搜索">
+      <label for="global-search" class="eyebrow">GLOBAL SEARCH</label>
+      <input id="global-search" class="pixel-input" type="search" placeholder="搜索藏品编号、展区、标签、描述、日志..." />
+    </section>
+
+    <main class="home-grid">
+      <section class="media-section pixel-card feature-section">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">TREASURE OF TRASH</p>
+            <h2>镇馆之宝</h2>
+          </div>
+          <a href="videos.html" class="section-link">进入影像展区 →</a>
+        </div>
+        <div class="feature-video" id="home-feature-video"></div>
+        <div class="mini-list" id="home-video-list"></div>
+      </section>
+
+      <section class="media-section pixel-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">RECENT ARRIVALS</p>
+            <h2>最近入馆</h2>
+          </div>
+          <a href="photos.html" class="section-link">进入视觉展区 →</a>
+        </div>
+        <div class="photo-wall compact" id="home-photo-list"></div>
+      </section>
+
+      <section class="media-section pixel-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">AUDIO TAPE</p>
+            <h2>声音碎片</h2>
+          </div>
+          <a href="audio.html" class="section-link">进入声音展区 →</a>
+        </div>
+        <div class="audio-list" id="home-audio-list"></div>
+      </section>
+
+      <section class="media-section pixel-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">PIXEL DIARY</p>
+            <h2>馆藏日志</h2>
+          </div>
+          <a href="logs.html" class="section-link">查看全部记录 →</a>
+        </div>
+        <div class="log-list" id="home-log-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>

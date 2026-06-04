@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>馆藏日志 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">PIXEL DIARY</p>
+        <h1>馆藏日志</h1>
+        <span class="section-tag">系统日志 / 生活日志</span>
+      </div>
+      <p class="hero-text">记录每次入馆、编辑、撤展，也保留馆长当天的天气、心情、地点和生活残片。</p>
+      <div class="page-actions">
+        <a href="logs.html?manage=1" class="pixel-button secondary" data-manage-link>入馆登记</a>
+        <a href="timeline.html" class="pixel-button tertiary">时间线</a>
+      </div>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card">
+        <div class="log-list full" id="log-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>

@@ -1,0 +1,26 @@
+services:
+  private-media-hub:
+    build: .
+    container_name: private-media-hub
+    ports:
+      - "127.0.0.1:8080:8080"
+    environment:
+      NODE_ENV: production
+      PORT: 8080
+      COOKIE_SECURE: "true"
+      MEDIA_HUB_PASSWORD: ${MEDIA_HUB_PASSWORD:?set MEDIA_HUB_PASSWORD in .env}
+      MEDIA_HUB_VIEW_PASSWORD: ${MEDIA_HUB_VIEW_PASSWORD:?set MEDIA_HUB_VIEW_PASSWORD in .env}
+      MEDIA_HUB_ADMIN_PASSWORD: ${MEDIA_HUB_ADMIN_PASSWORD:?set MEDIA_HUB_ADMIN_PASSWORD in .env}
+      SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      MEDIA_HUB_MAX_UPLOAD_BYTES: ${MEDIA_HUB_MAX_UPLOAD_BYTES:-8589934592}
+      MEDIA_HUB_MAX_BACKUPS: ${MEDIA_HUB_MAX_BACKUPS:-50}
+      MEDIA_ROOT: /app/assets
+      DATA_ROOT: /app/data
+      TRASH_ROOT: /app/trash
+      THUMB_ROOT: /app/thumbnails
+    volumes:
+      - ./assets:/app/assets
+      - ./data:/app/data
+      - ./trash:/app/trash
+      - ./thumbnails:/app/thumbnails
+    restart: unless-stopped

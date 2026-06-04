@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>系列影像 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">DRAMA ARCHIVE</p>
+        <h1>影视剧</h1>
+        <span class="section-tag">Series Folder</span>
+      </div>
+      <p class="hero-text">把长视频、影视剧和系列素材按文件夹整理。普通浏览页只展示内容，整理和上传入口放在管理页。</p>
+      <div class="page-actions">
+        <a href="drama.html?manage=1" class="pixel-button secondary" data-manage-link>进入管理</a>
+      </div>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card">
+        <div class="folder-ops manage-only">
+          <input id="drama-folder-name" class="pixel-input" type="text" placeholder="输入新文件夹名称，如：旅行合集" />
+          <button id="drama-folder-create" class="pixel-button secondary">新建文件夹</button>
+        </div>
+
+        <div class="folder-tabs" id="drama-folder-tabs"></div>
+
+        <div class="upload-panel manage-only">
+          <label for="drama-upload" class="pixel-button upload-btn secondary">入馆登记影像到当前文件夹</label>
+          <input id="drama-upload" type="file" accept="video/*" multiple />
+          <p class="upload-tip">上传到当前选中的文件夹（仅本地预览，刷新后失效）。</p>
+        </div>
+
+        <div class="media-list" id="drama-video-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>
