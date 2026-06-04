@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>标签与高级筛选 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">TAG INDEX</p>
+        <h1>标签与高级筛选</h1>
+        <span class="section-tag">标签云 / 展区管理 / 重点藏品 / 高级筛选</span>
+      </div>
+      <p class="hero-text">从标签、展区、藏品类型、可见性和重点标记重新进入馆藏。</p>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card">
+        <div class="advanced-filter-bar">
+          <input id="tag-filter-query" class="pixel-input" type="search" placeholder="搜索编号、标题、描述、标签、地点、心情、天气..." />
+          <select id="tag-filter-collection" class="pixel-input">
+            <option value="全部">全部类型</option>
+            <option value="电子垃圾">电子垃圾</option>
+            <option value="现实垃圾">现实垃圾</option>
+            <option value="生活日志">生活日志</option>
+          </select>
+          <select id="tag-filter-status" class="pixel-input">
+            <option value="全部">全部状态</option>
+            <option value="active">active</option>
+            <option value="archived">archived</option>
+            <option value="trashed">trashed</option>
+          </select>
+          <label class="folder-encrypt-toggle"><input id="tag-filter-favorite" type="checkbox" />只看重点藏品</label>
+        </div>
+      </section>
+
+      <section class="media-section pixel-card">
+        <div class="section-heading"><div><p class="eyebrow">TAG CLOUD</p><h2>标签云</h2></div></div>
+        <div class="tag-cloud" id="tag-cloud"></div>
+      </section>
+
+      <section class="media-section pixel-card">
+        <div class="section-heading"><div><p class="eyebrow">WINGS</p><h2>展区管理</h2></div></div>
+        <div class="tag-cloud" id="zone-cloud"></div>
+      </section>
+
+      <section class="media-section pixel-card">
+        <div class="section-heading"><div><p class="eyebrow">FAVORITES</p><h2>重点藏品</h2></div></div>
+        <div class="mini-list" id="favorite-items"></div>
+      </section>
+
+      <section class="media-section pixel-card">
+        <div class="section-heading"><div><p class="eyebrow">FILTER RESULT</p><h2>高级筛选结果</h2></div></div>
+        <div class="mini-list" id="advanced-filter-results"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>

@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>废弃区 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">DISCARDED WING</p>
+        <h1>废弃区</h1>
+        <span class="section-tag">恢复 / 彻底销毁 / 清空</span>
+      </div>
+      <p class="hero-text">这里集中处理被撤展的影像、照片和音频。恢复、彻底销毁和清空操作只在馆长后台中使用。</p>
+      <div class="page-actions">
+        <a href="index.html" class="pixel-button secondary">返回浏览</a>
+      </div>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">SAFE DELETE</p>
+            <h2>待处理文件</h2>
+            <p class="upload-tip" id="trash-count">正在读取废弃区...</p>
+          </div>
+          <button class="danger-button manage-only" id="trash-clear" type="button" disabled>清空废弃区</button>
+        </div>
+        <div class="trash-list" id="trash-list"></div>
+      </section>
+
+      <section class="media-section pixel-card manage-only">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">DATA BACKUP</p>
+            <h2>数据备份</h2>
+            <p class="upload-tip" id="backup-status">自动备份会在写入 media-db.json 或 logs.json 前生成。</p>
+          </div>
+          <a class="pixel-button secondary" href="/api/export" download>导出数据</a>
+        </div>
+        <div class="backup-list" id="backup-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>

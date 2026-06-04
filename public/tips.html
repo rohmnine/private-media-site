@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>使用说明 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">GUIDE BOOK</p>
+        <h1>使用说明</h1>
+        <span class="section-tag">Guide</span>
+      </div>
+      <p class="hero-text">了解如何维护这个像素垃圾博物馆，并为后续部署做准备。</p>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card tips-panel">
+        <ol>
+          <li>推荐通过 <code>npm start</code> 启动本地 Node.js 服务，再用 <code>http://127.0.0.1:8080</code> 或局域网地址访问。直接双击 HTML 只能使用静态预览。</li>
+          <li>影像碎片、视觉残片、声音碎片页面支持入馆登记并持久保存到后端配置的媒体目录；默认分别是 <code>assets/video</code>、<code>assets/photos</code>、<code>assets/audio</code>。</li>
+          <li>可以在 <code>.env</code> 中配置 <code>MEDIA_ROOT</code>、<code>DATA_ROOT</code>、<code>TRASH_ROOT</code>、<code>THUMB_ROOT</code>，把藏品、数据、废弃区和缩略图缓存迁移到数据盘或 NAS。</li>
+          <li>每件媒体藏品会生成 <code>museumId</code> 藏品编号，并带有 <code>collectionType</code>：电子垃圾 / 现实垃圾 / 生活日志。</li>
+          <li><code>item.html</code> 展示藏品详情，<code>timeline.html</code> 按日期混合展示照片、视频、音频和日志。</li>
+          <li>删除藏品会先移入废弃区，可在废弃区页面恢复、彻底销毁或清空；重要操作会自动写入系统日志。</li>
+          <li>入馆登记会校验扩展名、MIME 类型和常见文件头；不匹配的文件会被跳过，登记失败时会清理临时文件。</li>
+        </ol>
+      </section>
+    </main>
+  </div>
+</body>
+</html>

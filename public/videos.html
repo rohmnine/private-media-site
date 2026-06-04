@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>影像碎片 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">VIDEO GALLERY</p>
+        <h1>影像碎片</h1>
+        <span class="section-tag">电子垃圾展区</span>
+      </div>
+      <p class="hero-text">陈列所有被登记入馆的视频残片。每段影像都拥有藏品编号、展区、标签和可追溯档案。</p>
+      <div class="page-actions">
+        <a href="videos.html?manage=1" class="pixel-button secondary" data-manage-link>入馆登记</a>
+        <a href="timeline.html" class="pixel-button tertiary">时间线</a>
+      </div>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card">
+        <div class="upload-panel manage-only">
+          <div class="registration-fields">
+            <input class="pixel-input" name="title" placeholder="藏品名称（留空使用文件名）" />
+            <input class="pixel-input" name="description" placeholder="藏品描述" />
+            <select class="pixel-input" name="collectionType"><option>电子垃圾</option><option>现实垃圾</option><option>生活日志</option></select>
+            <input class="pixel-input" name="objectType" value="video" placeholder="objectType" />
+            <input class="pixel-input" name="recordDate" type="date" />
+            <input class="pixel-input" name="location" placeholder="地点" />
+            <input class="pixel-input" name="mood" placeholder="心情" />
+            <input class="pixel-input" name="weather" placeholder="天气" />
+            <select class="pixel-input" name="visibility"><option value="private">private</option><option value="public">public</option><option value="hidden">hidden</option></select>
+            <label class="folder-encrypt-toggle"><input name="isFavorite" type="checkbox" />重点藏品</label>
+          </div>
+          <label for="video-upload" class="pixel-button upload-btn">入馆登记影像</label>
+          <input id="video-upload" type="file" accept="video/*" multiple />
+          <p class="upload-tip">通过 npm start 打开网站后，影像会保存到 assets/video，登记完成后自动进入藏品详情页。</p>
+          <p class="upload-tip" id="upload-status"></p>
+        </div>
+
+        <div class="manager-panel manage-only">
+          <form class="category-form" data-category-form="videos">
+            <input class="pixel-input" name="name" type="text" placeholder="新建展区，如：旅行残片 / 演出残影 / 城市噪点" />
+            <button class="pixel-button secondary" type="submit">新建展区</button>
+          </form>
+          <div class="batch-manager" id="videos-batch-manager"></div>
+        </div>
+
+        <div class="folder-tabs" id="videos-category-tabs"></div>
+
+        <div class="video-grid" id="video-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>

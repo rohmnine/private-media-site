@@ -1,0 +1,11 @@
+/.env
+node_modules/
+.idea/
+.kilo/
+.omc/
+data/
+.media-db.json
+assets/
+thumbnails/
+trash/
+.kilo/node_modules/

@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>视觉残片 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">PHOTO WALL</p>
+        <h1>视觉残片</h1>
+        <span class="section-tag">现实垃圾展区</span>
+      </div>
+      <p class="hero-text">浏览所有被打捞出来的照片残片。点击图片可预览，进入档案可查看藏品编号、描述、标签、地点和操作记录。</p>
+      <div class="page-actions">
+        <a href="photos.html?manage=1" class="pixel-button secondary" data-manage-link>入馆登记</a>
+        <a href="timeline.html" class="pixel-button tertiary">时间线</a>
+      </div>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card">
+        <div class="upload-panel manage-only">
+          <div class="registration-fields">
+            <input class="pixel-input" name="title" placeholder="藏品名称（留空使用文件名）" />
+            <input class="pixel-input" name="description" placeholder="藏品描述" />
+            <select class="pixel-input" name="collectionType"><option>现实垃圾</option><option>电子垃圾</option><option>生活日志</option></select>
+            <input class="pixel-input" name="objectType" value="photo" placeholder="objectType" />
+            <input class="pixel-input" name="recordDate" type="date" />
+            <input class="pixel-input" name="location" placeholder="地点" />
+            <input class="pixel-input" name="mood" placeholder="心情" />
+            <input class="pixel-input" name="weather" placeholder="天气" />
+            <select class="pixel-input" name="visibility"><option value="private">private</option><option value="public">public</option><option value="hidden">hidden</option></select>
+            <label class="folder-encrypt-toggle"><input name="isFavorite" type="checkbox" />重点藏品</label>
+          </div>
+          <label for="photo-upload" class="pixel-button upload-btn tertiary">入馆登记照片</label>
+          <input id="photo-upload" type="file" accept="image/*" multiple />
+          <p class="upload-tip" id="photo-upload-context">先进入展区或日期文件夹，登记时会自动放进当前位置。</p>
+        </div>
+
+        <div class="manager-panel manage-only">
+          <form class="category-form" data-category-form="photos">
+            <input class="pixel-input" name="name" type="text" placeholder="新建展区，如：宝丽来 / 全能400 / 城市残片" />
+            <input class="pixel-input" name="cover" type="url" placeholder="展区封面图片地址" />
+            <input class="pixel-input" name="note" type="text" placeholder="展区说明，如：暖色、颗粒、旅行扫街" />
+            <button class="pixel-button tertiary" type="submit">新建展区</button>
+          </form>
+          <div class="batch-manager" id="photos-batch-manager"></div>
+          <p class="upload-tip">先进入展区，再进入日期文件夹。藏品卡片里可以移动展区和文件夹。</p>
+        </div>
+
+        <div class="folder-tabs" id="photos-category-tabs"></div>
+
+        <div class="photo-breadcrumb" id="photo-breadcrumb"></div>
+        <div class="film-album-grid" id="photo-category-albums"></div>
+        <div class="film-folder-grid" id="photo-folder-list"></div>
+        <div class="photo-wall" id="photo-list"></div>
+
+        <section class="photo-manage-panel manage-only" aria-labelledby="photo-manage-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">PHOTO CRUD</p>
+              <h2 id="photo-manage-title">当前文件夹照片管理</h2>
+              <p class="upload-tip">先进入展区和日期文件夹，只管理当前文件夹内的照片；加密文件夹需要解锁后才会显示管理内容。</p>
+            </div>
+            <span class="section-tag" id="photo-manage-count">0 张照片可管理</span>
+          </div>
+          <div class="photo-manage-list" id="photo-manage-list"></div>
+        </section>
+      </section>
+    </main>
+  </div>
+
+  <div id="photo-lightbox" class="lightbox" aria-hidden="true">
+    <button id="lightbox-close" class="lightbox-close" aria-label="关闭">×</button>
+    <button id="lightbox-prev" class="lightbox-nav lightbox-prev" type="button" aria-label="上一张">‹</button>
+    <img id="lightbox-image" class="lightbox-image" alt="" />
+    <button id="lightbox-next" class="lightbox-nav lightbox-next" type="button" aria-label="下一张">›</button>
+    <p id="lightbox-caption" class="lightbox-caption"></p>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>
