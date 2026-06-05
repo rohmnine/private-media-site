@@ -8,6 +8,12 @@ try {
 } catch (error) {
   // sharp is optional at runtime: image thumbnails fall back to copying originals until dependencies are installed.
 }
+let exifReader = null;
+try {
+  exifReader = require("exif-reader");
+} catch (error) {
+  // exif-reader is optional at runtime: photo EXIF panels are simply hidden when it is unavailable.
+}
 const fastify = require("fastify")({ logger: true });
 const multipart = require("@fastify/multipart");
 const staticPlugin = require("@fastify/static");
@@ -46,6 +52,8 @@ const COLLECTION_TYPES = new Set(["电子垃圾", "现实垃圾", "生活日志"
 const VISIBILITY_TYPES = new Set(["private", "public", "hidden"]);
 const STATUS_TYPES = new Set(["active", "trashed", "archived"]);
 const MAX_BACKUP_FILES = Number(process.env.MEDIA_HUB_MAX_BACKUPS || 50);
+const TRASH_RETENTION_DAYS = Number(process.env.MEDIA_HUB_TRASH_RETENTION_DAYS || 30);
+const TRASH_PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 if (MEDIA_HUB_VIEW_PASSWORD === MEDIA_HUB_PASSWORD || MEDIA_HUB_ADMIN_PASSWORD === MEDIA_HUB_PASSWORD) {
   throw new Error("MEDIA_HUB_VIEW_PASSWORD 和 MEDIA_HUB_ADMIN_PASSWORD 必须与 MEDIA_HUB_PASSWORD 不一致");
@@ -561,6 +569,76 @@ function findPhotoByThumbnail(thumbnailName) {
   return listMedia("photos").find((item) => path.basename(item.thumbnailPath || "") === clean) || null;
 }
 
+function formatShutter(exposureTime) {
+  const seconds = Number(exposureTime);
+  if (!Number.isFinite(seconds) || seconds <= 0) return "";
+  if (seconds >= 1) return `${Number(seconds.toFixed(1))}s`;
+  return `1/${Math.round(1 / seconds)}s`;
+}
+
+function dmsToDecimal(parts, ref) {
+  if (!Array.isArray(parts) || parts.length < 3) return null;
+  const [deg, min, sec] = parts.map(Number);
+  if (![deg, min, sec].every(Number.isFinite)) return null;
+  let decimal = deg + min / 60 + sec / 3600;
+  if (ref === "S" || ref === "W") decimal = -decimal;
+  return Number(decimal.toFixed(6));
+}
+
+async function readPhotoExifData(filename) {
+  if (!sharp || !exifReader) return null;
+  const { targetPath } = resolveManagedPath("photos", filename);
+  if (!fs.existsSync(targetPath)) throw createHttpError("FILE_NOT_FOUND", "文件不存在", 404);
+  let metadata;
+  try {
+    metadata = await sharp(targetPath).metadata();
+  } catch (error) {
+    fastify.log.warn({ error, targetPath }, "Failed to read image metadata");
+    return null;
+  }
+  const result = {
+    width: metadata.width || null,
+    height: metadata.height || null,
+    make: "",
+    model: "",
+    lens: "",
+    dateTaken: "",
+    iso: "",
+    aperture: "",
+    shutter: "",
+    focalLength: "",
+    gps: null
+  };
+  if (metadata.exif) {
+    try {
+      const parsed = exifReader(metadata.exif);
+      const image = parsed.Image || {};
+      const photo = parsed.Photo || {};
+      const gps = parsed.GPSInfo || {};
+      result.make = String(image.Make || "").trim();
+      result.model = String(image.Model || "").trim();
+      result.lens = String(photo.LensModel || "").trim();
+      const taken = photo.DateTimeOriginal || photo.DateTimeDigitized || image.DateTime;
+      if (taken) {
+        const date = taken instanceof Date ? taken : new Date(taken);
+        if (!Number.isNaN(date.getTime())) result.dateTaken = date.toISOString().replace("T", " ").slice(0, 19);
+      }
+      const iso = photo.ISOSpeedRatings ?? photo.PhotographicSensitivity;
+      if (iso != null) result.iso = String(Array.isArray(iso) ? iso[0] : iso);
+      if (Number.isFinite(Number(photo.FNumber))) result.aperture = `f/${Number(photo.FNumber)}`;
+      result.shutter = formatShutter(photo.ExposureTime);
+      if (Number.isFinite(Number(photo.FocalLength))) result.focalLength = `${Number(photo.FocalLength)}mm`;
+      const lat = dmsToDecimal(gps.GPSLatitude, gps.GPSLatitudeRef);
+      const lon = dmsToDecimal(gps.GPSLongitude, gps.GPSLongitudeRef);
+      if (lat != null && lon != null) result.gps = { lat, lon };
+    } catch (error) {
+      fastify.log.warn({ error, targetPath }, "Failed to parse EXIF data");
+    }
+  }
+  const hasExif = result.make || result.model || result.lens || result.dateTaken || result.iso || result.aperture || result.shutter || result.focalLength || result.gps;
+  return { ...result, hasExif: Boolean(hasExif) };
+}
+
 function canAccessPhoto(request, photo) {
   if (!photo) return false;
   const db = readDb();
@@ -936,6 +1014,30 @@ function clearTrash() {
   addSystemLog("清空回收站", `永久删除 ${removed} 个回收站文件`, ["回收站", "清理"]);
 }
 
+function purgeExpiredTrash(retentionDays = TRASH_RETENTION_DAYS) {
+  const days = Number(retentionDays);
+  if (!Number.isFinite(days) || days <= 0) return 0;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  const db = readDb();
+  const expired = db.trash.filter((entry) => {
+    const deletedAt = Date.parse(entry.deletedAt);
+    return Number.isFinite(deletedAt) && deletedAt < cutoff;
+  });
+  if (!expired.length) return 0;
+  expired.forEach((entry) => {
+    const type = mediaTypes[entry.type];
+    if (!type) return;
+    const trashPath = path.join(type.trashDir, safeName(entry.trashFilename));
+    assertInside(type.trashDir, trashPath);
+    if (fs.existsSync(trashPath)) fs.unlinkSync(trashPath);
+  });
+  const expiredIds = new Set(expired.map((entry) => entry.id));
+  db.trash = db.trash.filter((entry) => !expiredIds.has(entry.id));
+  writeDb(db);
+  addSystemLog(`废弃区自动清理 ${expired.length} 件`, `自动销毁了 ${expired.length} 个进入废弃区超过 ${days} 天的文件`, ["回收站", "清理", "自动"]);
+  return expired.length;
+}
+
 const allowedMimes = {
   videos: [/^video\//, /^application\/octet-stream$/],
   photos: [/^image\//],
@@ -1088,6 +1190,22 @@ if (!fs.existsSync(DB_PATH)) {
 }
 if (!fs.existsSync(LOGS_PATH)) writeLogs(defaultLogs);
 
+if (TRASH_RETENTION_DAYS > 0) {
+  try {
+    purgeExpiredTrash();
+  } catch (error) {
+    fastify.log.warn({ error }, "Failed to purge expired trash on startup");
+  }
+  const purgeTimer = setInterval(() => {
+    try {
+      purgeExpiredTrash();
+    } catch (error) {
+      fastify.log.warn({ error }, "Failed to purge expired trash on schedule");
+    }
+  }, TRASH_PURGE_INTERVAL_MS);
+  if (typeof purgeTimer.unref === "function") purgeTimer.unref();
+}
+
 fastify.register(multipart, {
   limits: { fileSize: MAX_UPLOAD_BYTES }
 });
@@ -1222,6 +1340,14 @@ fastify.register(staticPlugin, {
 });
 
 fastify.get("/api/media", async (request) => ok(responsePayloadForRequest(request)));
+
+fastify.get("/api/media/photos/:filename/exif", async (request, reply) => {
+  const photo = findPhotoByFilename(request.params.filename);
+  if (!photo) return reply.code(404).send({ success: false, message: "藏品不存在", code: "FILE_NOT_FOUND" });
+  if (!canAccessPhoto(request, photo)) return reply.code(403).send({ success: false, message: "请先解锁该加密展柜", code: "FOLDER_LOCKED" });
+  const exif = await readPhotoExifData(photo.filename);
+  return ok({ exif });
+});
 
 fastify.get("/api/backups", async (request, reply) => {
   if (!hasAdminSession(request)) return reply.code(403).send({ success: false, message: "请先解锁馆长功能", code: "ADMIN_REQUIRED" });
