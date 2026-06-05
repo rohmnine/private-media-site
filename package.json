@@ -5,6 +5,7 @@
   "dependencies": {
     "@fastify/multipart": "latest",
     "@fastify/static": "latest",
+    "exif-reader": "latest",
     "fastify": "latest",
     "sharp": "latest"
   },
