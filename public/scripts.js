@@ -1721,9 +1721,47 @@ function renderItemDetail() {
   const from = params.get("from") || fallbackFrom;
   const actions = `<div class="page-actions"><a class="pixel-button tertiary" href="${escapeHtml(from)}">返回来源页</a>${type !== "logs" && canManage() ? `<button class="danger-button" data-item-trash type="button">移入废弃区</button>` : ""}</div>`;
   const editForm = type !== "logs" && canManage() ? `<form class="edit-form item-edit-form" data-item-edit>${metadataFieldsMarkup(item, type)}<button class="pixel-button secondary" type="submit">保存藏品档案</button></form>` : "";
-  target.innerHTML = `<article class="item-detail-card pixel-card"><div class="section-heading"><div><p class="eyebrow">COLLECTION FILE</p><h2>${escapeHtml(item.title)}</h2><p class="meta-line">藏品编号：${escapeHtml(item.museumId || item.id || "未编号")} · ${escapeHtml(item.collectionType || "生活日志")} · ${item.isFavorite ? "重点藏品" : "普通藏品"}</p></div>${actions}</div><div class="item-detail-grid"><div>${mediaPreviewMarkup(type, item)}</div><div class="item-facts"><p><strong>objectType：</strong>${escapeHtml(item.objectType)}</p><p><strong>recordDate：</strong>${escapeHtml(item.recordDate)}</p><p><strong>展区：</strong>${escapeHtml(item.category || itemTypeLabel(type))}</p><p><strong>描述：</strong>${escapeHtml(item.description || item.summary || "暂无描述")}</p><p><strong>标签：</strong>${tags.length ? tags.map((tag) => `#${escapeHtml(tag)}`).join(" ") : "暂无标签"}</p><p><strong>地点：</strong>${escapeHtml(item.location || item.folder || "未记录")}</p><p><strong>心情：</strong>${escapeHtml(item.mood || "未记录")}</p><p><strong>天气：</strong>${escapeHtml(item.weather || "未记录")}</p><p><strong>visibility：</strong>${escapeHtml(item.visibility)}</p><p><strong>status：</strong>${escapeHtml(item.status)}</p><p><strong>操作记录：</strong>${escapeHtml(item.updatedAt ? new Date(item.updatedAt).toLocaleString() : item.date || "静态藏品")}</p></div></div>${editForm}</article>`;
+  const exifSection = type === "photos" && canUseApi ? `<div class="item-exif" id="item-exif"><div class="section-heading"><h3>拍摄参数 EXIF</h3><span class="section-tag">EXIF</span></div><p class="hero-text" data-exif-loading>正在读取拍摄参数…</p></div>` : "";
+  target.innerHTML = `<article class="item-detail-card pixel-card"><div class="section-heading"><div><p class="eyebrow">COLLECTION FILE</p><h2>${escapeHtml(item.title)}</h2><p class="meta-line">藏品编号：${escapeHtml(item.museumId || item.id || "未编号")} · ${escapeHtml(item.collectionType || "生活日志")} · ${item.isFavorite ? "重点藏品" : "普通藏品"}</p></div>${actions}</div><div class="item-detail-grid"><div>${mediaPreviewMarkup(type, item)}</div><div class="item-facts"><p><strong>objectType：</strong>${escapeHtml(item.objectType)}</p><p><strong>recordDate：</strong>${escapeHtml(item.recordDate)}</p><p><strong>展区：</strong>${escapeHtml(item.category || itemTypeLabel(type))}</p><p><strong>描述：</strong>${escapeHtml(item.description || item.summary || "暂无描述")}</p><p><strong>标签：</strong>${tags.length ? tags.map((tag) => `#${escapeHtml(tag)}`).join(" ") : "暂无标签"}</p><p><strong>地点：</strong>${escapeHtml(item.location || item.folder || "未记录")}</p><p><strong>心情：</strong>${escapeHtml(item.mood || "未记录")}</p><p><strong>天气：</strong>${escapeHtml(item.weather || "未记录")}</p><p><strong>visibility：</strong>${escapeHtml(item.visibility)}</p><p><strong>status：</strong>${escapeHtml(item.status)}</p><p><strong>操作记录：</strong>${escapeHtml(item.updatedAt ? new Date(item.updatedAt).toLocaleString() : item.date || "静态藏品")}</p></div></div>${exifSection}${editForm}</article>`;
   bindVideoControls(target);
   bindItemDetailActions(target, type, item);
+  if (type === "photos" && canUseApi) loadPhotoExif(item);
+}
+
+function exifRows(exif) {
+  const rows = [];
+  if (exif.dateTaken) rows.push(["拍摄时间", exif.dateTaken]);
+  const camera = [exif.make, exif.model].filter(Boolean).join(" ");
+  if (camera) rows.push(["相机", camera]);
+  if (exif.lens) rows.push(["镜头", exif.lens]);
+  if (exif.focalLength) rows.push(["焦距", exif.focalLength]);
+  if (exif.aperture) rows.push(["光圈", exif.aperture]);
+  if (exif.shutter) rows.push(["快门", exif.shutter]);
+  if (exif.iso) rows.push(["ISO", exif.iso]);
+  if (exif.width && exif.height) rows.push(["分辨率", `${exif.width} × ${exif.height}`]);
+  if (exif.gps) rows.push(["GPS", `${exif.gps.lat}, ${exif.gps.lon}`]);
+  return rows;
+}
+
+function loadPhotoExif(item) {
+  const panel = byId("item-exif");
+  if (!panel || !canUseApi || !item || !item.filename) return;
+  requestApi(`/api/media/photos/${encodeURIComponent(item.filename)}/exif`)
+    .then((data) => {
+      const exif = data && data.exif;
+      const loading = panel.querySelector("[data-exif-loading]");
+      if (!exif || !exif.hasExif) {
+        if (loading) loading.textContent = "这张照片没有可读取的 EXIF 拍摄信息。";
+        return;
+      }
+      const rows = exifRows(exif);
+      const mapLink = exif.gps ? `<a class="text-link" href="https://www.openstreetmap.org/?mlat=${exif.gps.lat}&mlon=${exif.gps.lon}#map=15/${exif.gps.lat}/${exif.gps.lon}" target="_blank" rel="noopener">在地图上查看拍摄位置 →</a>` : "";
+      panel.innerHTML = `<div class="section-heading"><h3>拍摄参数 EXIF</h3><span class="section-tag">EXIF</span></div><div class="exif-grid">${rows.map(([key, value]) => `<p><strong>${escapeHtml(key)}：</strong>${escapeHtml(String(value))}</p>`).join("")}</div>${mapLink}`;
+    })
+    .catch(() => {
+      const loading = panel.querySelector("[data-exif-loading]");
+      if (loading) loading.textContent = "读取 EXIF 信息失败。";
+    });
 }
 
 function renderTimeline() {

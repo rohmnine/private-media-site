@@ -6,16 +6,19 @@
 
 ## 功能特性
 
-- 访问密码保护：页面、入馆登记、删除、编辑、展区管理、藏品扫描接口均需要登录。
+- 三级密码保护：`MEDIA_HUB_PASSWORD` 控制整站访问登录，`MEDIA_HUB_ADMIN_PASSWORD`（馆长密码）解锁备份、恢复、导出、废弃区彻底删除等管理操作，`MEDIA_HUB_VIEW_PASSWORD`（查看密码）用于单独解锁加密相册展柜。三个密码必须互不相同，否则服务启动会报错。
+- 加密相册展柜：照片展区中的指定文件夹可标记为加密，未用查看密码解锁时不会出现在列表、详情、缩略图和 EXIF 接口中。
 - 路径安全校验：后端只允许操作配置媒体目录中的受支持媒体文件，默认是 `assets/video`、`assets/photos`、`assets/audio`。
 - 入馆登记校验：按视频、图片、音频分别限制扩展名，并校验 MIME 类型、常见文件头和最大上传体积；登记失败会清理临时文件。
 - 统一数据目录：藏品元数据与日志存储在 `data/` 目录，可通过 `.env` 迁移到数据盘或 NAS。
 - 缩略图/封面缓存：照片列表优先读取 `thumbnails/photos` 缓存，视频和音频使用像素风 SVG 占位封面。
 - 管理入口隔离：影像碎片、视觉残片、声音碎片、馆藏日志和废弃区的登记、编辑、删除、展区管理等操作默认隐藏，需要点击页面中的“入馆登记”或首页“馆长后台”后才显示。
 - 废弃区删除：删除藏品时先移动到 `trash/`，可从馆长后台进入废弃区后恢复、彻底销毁或清空废弃区。
+- 废弃区自动清理：进入废弃区超过保留天数（默认 30 天，由 `MEDIA_HUB_TRASH_RETENTION_DAYS` 配置）的文件会在服务启动时及每 6 小时自动彻底销毁，并写入操作日志；设为 `0` 可关闭自动清理。
 - 藏品编号：每个媒体项都会输出 `museumId` 藏品编号，并带有 `collectionType`：电子垃圾 / 现实垃圾 / 生活日志。
 - 完整藏品元数据：读取旧数据时自动补默认值，不直接破坏旧 JSON。字段包括 `museumId`、`collectionType`、`objectType`、`recordDate`、`location`、`mood`、`weather`、`isFavorite`、`visibility`、`status`。
 - 藏品详情：新增 `item.html`，展示完整元数据，馆长模式下支持编辑并移入废弃区。
+- 照片 EXIF 展示：照片详情页自动读取并展示拍摄时间、相机、镜头、ISO、光圈、快门、焦距和分辨率；含 GPS 信息时提供地图链接（依赖 `sharp` 与 `exif-reader`，缺失时该面板自动隐藏）。
 - 时间线：新增 `timeline.html`，按 `recordDate` / `createdAt` 分组混合展示照片、视频、音频和生活日志，并支持按类型筛选。
 - 标签与高级筛选：新增 `tags.html`，提供标签云、展区管理视图、重点藏品和高级筛选入口。
 - 自动操作日志与手动日志：入馆登记、编辑、展区管理、移入废弃区等重要操作会写入日志；日志管理模式支持新增、编辑、删除。
@@ -214,14 +217,19 @@ npm install
 
 ```env
 MEDIA_HUB_PASSWORD=123456
+MEDIA_HUB_VIEW_PASSWORD=view-123456
+MEDIA_HUB_ADMIN_PASSWORD=admin-123456
 SESSION_SECRET=replace-with-a-long-random-secret
 MEDIA_HUB_MAX_UPLOAD_BYTES=8589934592
+MEDIA_HUB_TRASH_RETENTION_DAYS=30
 PORT=8080
 MEDIA_ROOT=./assets
 DATA_ROOT=./data
 TRASH_ROOT=./trash
 THUMB_ROOT=./thumbnails
 ```
+
+> **重要**：三个密码（`MEDIA_HUB_PASSWORD`、`MEDIA_HUB_VIEW_PASSWORD`、`MEDIA_HUB_ADMIN_PASSWORD`）必须互不相同，否则服务启动会报错。正式使用时务必修改为高强度密码。
 
 启动本地服务：
 
@@ -314,14 +322,14 @@ trash/audio
 
 ## 后续计划
 
-- 废弃区自动清理：自动清理 30 天前文件。
+- ~~废弃区自动清理~~：已实现，详见功能特性。
 - Docker 化部署：新增 `Dockerfile`、`docker-compose.yml`，支持容器化启动和数据卷挂载。
 - NAS / 数据盘架构：支持将 `assets/`、`data/`、`trash/`、`thumbnails/` 挂载到外部数据盘或 NAS。
 - 真实缩略图：使用 `ffmpeg` 为视频生成封面，为照片生成缩略图，并缓存到 `thumbnails/`。
 - 完整归档导出：进一步打包 `data/`、`assets/`、`trash/`、`thumbnails/`，当前已支持 JSON 级导出和恢复。
 - 展区增强：重命名、排序、颜色、图标、封面、说明和数量统计。
 - 日志增强：新增、编辑、删除、Markdown、草稿、置顶、标签归档。
-- 照片 EXIF：展示拍摄时间、相机、镜头、ISO、光圈、快门、焦距、GPS。
+- ~~照片 EXIF~~：已实现，详见功能特性。
 - 音频增强：播放列表、上一首/下一首、随机播放、歌词、专辑封面、ID3 标签。
 - Vue3 重构：把当前原生 HTML/JS 拆成组件化应用。
 - SQLite 替代 JSON：把藏品元数据、日志、备份索引迁移到数据库。
