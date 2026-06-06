@@ -24,9 +24,10 @@ const siteData = {
   videos: [...fallbackData.videos],
   photos: [...fallbackData.photos],
   audios: [...fallbackData.audios],
+  books: [],
   dramas: [{ name: "我的视频合集", videos: [...fallbackData.videos.slice(0, 1)] }],
   logs: [...fallbackData.logs],
-  categories: { videos: ["默认"], photos: ["默认"], audios: ["默认"] },
+  categories: { videos: ["默认"], photos: ["默认"], audios: ["默认"], books: ["默认"] },
   categoryMeta: { photos: {} },
   stats: null,
   trash: []
@@ -39,13 +40,13 @@ const currentPage = location.pathname.split("/").pop() || "index.html";
 const unlockedPhotoFolders = new Set(canUseApi ? [] : JSON.parse(sessionStorage.getItem("mediaHubUnlockedPhotoFolders") || "[]"));
 let adminUnlocked = !canUseApi;
 let activeDramaIndex = 0;
-let activeFilters = { videos: "全部", photos: "全部", audios: "全部" };
+let activeFilters = { videos: "全部", photos: "全部", audios: "全部", books: "全部" };
 let activePhotoCategory = null;
 let activePhotoFolder = null;
 let globalSearchTerm = "";
-const pageSize = { videos: 6, photos: 24, photoManage: 12, audios: 10 };
-const pageState = { videos: 1, photos: 1, photoManage: 1, audios: 1 };
-const batchSelection = { videos: new Set(), photos: new Set(), audios: new Set() };
+const pageSize = { videos: 6, photos: 24, photoManage: 12, audios: 10, books: 12 };
+const pageState = { videos: 1, photos: 1, photoManage: 1, audios: 1, books: 1 };
+const batchSelection = { videos: new Set(), photos: new Set(), audios: new Set(), books: new Set() };
 let backupItems = [];
 let backupsLoaded = false;
 
@@ -95,12 +96,17 @@ function normalizeServerAudio(item) {
   return normalizeMuseumItem("audios", { ...item, description: item.description || `保存在本地 assets/audio · ${formatBytes(item.size)}`, duration: formatBytes(item.size), tags, managed: true });
 }
 
+function normalizeServerBook(item) {
+  const tags = normalizeTags(item.tags);
+  return normalizeMuseumItem("books", { ...item, author: item.author || "", description: item.description || `保存在本地 assets/books · ${formatBytes(item.size)}`, duration: formatBytes(item.size), thumbnailPath: item.thumbnailPath || "", tags, managed: true });
+}
+
 function defaultCollectionType(type) {
   return type === "photos" ? "现实垃圾" : type === "audios" || type === "logs" ? "生活日志" : "电子垃圾";
 }
 
 function defaultObjectType(type) {
-  return ({ videos: "video", photos: "photo", audios: "audio", logs: "log" })[type] || "object";
+  return ({ videos: "video", photos: "photo", audios: "audio", books: "book", logs: "log" })[type] || "object";
 }
 
 function normalizeDateInput(value) {
@@ -130,7 +136,7 @@ function collectionOptions(selected = "电子垃圾") {
 }
 
 function itemTypeLabel(type) {
-  return ({ videos: "影像碎片", photos: "视觉残片", audios: "声音碎片", logs: "生活日志" })[type] || "藏品";
+  return ({ videos: "影像碎片", photos: "视觉残片", audios: "声音碎片", books: "纸页藏书", logs: "生活日志" })[type] || "藏品";
 }
 
 function itemDetailUrl(type, item) {
@@ -145,6 +151,7 @@ function allMuseumItems() {
     ...siteData.videos.map((item) => ({ ...normalizeMuseumItem("videos", item), type: "videos" })),
     ...siteData.photos.filter(canViewPhotoItem).map((item) => ({ ...normalizeMuseumItem("photos", item), type: "photos" })),
     ...siteData.audios.map((item) => ({ ...normalizeMuseumItem("audios", item), type: "audios" })),
+    ...siteData.books.map((item) => ({ ...normalizeMuseumItem("books", item), type: "books" })),
     ...siteData.logs.map((item) => ({ ...normalizeMuseumItem("logs", item), type: "logs", collectionType: "生活日志", museumId: item.id || item.date }))
   ];
 }
@@ -251,7 +258,8 @@ function appendRegistrationFields(formData, input) {
 
 function metadataFieldsMarkup(item = {}, type = "videos") {
   const normalized = normalizeMuseumItem(type, item);
-  return `<input class="pixel-input" name="title" value="${escapeHtml(item.title || "")}" placeholder="藏品名称" /><input class="pixel-input" name="description" value="${escapeHtml(item.description || item.summary || "")}" placeholder="藏品描述" /><input class="pixel-input" name="category" value="${escapeHtml(item.category || "默认")}" placeholder="展区" /><select class="pixel-input" name="collectionType">${collectionOptions(normalized.collectionType)}</select><input class="pixel-input" name="objectType" value="${escapeHtml(normalized.objectType)}" placeholder="objectType" /><input class="pixel-input" name="recordDate" type="date" value="${escapeHtml(normalized.recordDate)}" /><input class="pixel-input" name="location" value="${escapeHtml(normalized.location)}" placeholder="地点" /><input class="pixel-input" name="mood" value="${escapeHtml(normalized.mood)}" placeholder="心情" /><input class="pixel-input" name="weather" value="${escapeHtml(normalized.weather)}" placeholder="天气" /><input class="pixel-input" name="tags" value="${escapeHtml(tagsValue(item))}" placeholder="标签，用逗号分隔" /><select class="pixel-input" name="visibility"><option value="private" ${normalized.visibility === "private" ? "selected" : ""}>private</option><option value="public" ${normalized.visibility === "public" ? "selected" : ""}>public</option><option value="hidden" ${normalized.visibility === "hidden" ? "selected" : ""}>hidden</option></select><select class="pixel-input" name="status"><option value="active" ${normalized.status === "active" ? "selected" : ""}>active</option><option value="archived" ${normalized.status === "archived" ? "selected" : ""}>archived</option><option value="trashed" ${normalized.status === "trashed" ? "selected" : ""}>trashed</option></select><label class="folder-encrypt-toggle"><input name="isFavorite" type="checkbox" ${normalized.isFavorite ? "checked" : ""} />重点藏品</label>`;
+  const authorField = type === "books" ? `<input class="pixel-input" name="author" value="${escapeHtml(item.author || "")}" placeholder="作者" />` : "";
+  return `<input class="pixel-input" name="title" value="${escapeHtml(item.title || "")}" placeholder="藏品名称" />${authorField}<input class="pixel-input" name="description" value="${escapeHtml(item.description || item.summary || "")}" placeholder="藏品描述" /><input class="pixel-input" name="category" value="${escapeHtml(item.category || "默认")}" placeholder="展区" /><select class="pixel-input" name="collectionType">${collectionOptions(normalized.collectionType)}</select><input class="pixel-input" name="objectType" value="${escapeHtml(normalized.objectType)}" placeholder="objectType" /><input class="pixel-input" name="recordDate" type="date" value="${escapeHtml(normalized.recordDate)}" /><input class="pixel-input" name="location" value="${escapeHtml(normalized.location)}" placeholder="地点" /><input class="pixel-input" name="mood" value="${escapeHtml(normalized.mood)}" placeholder="心情" /><input class="pixel-input" name="weather" value="${escapeHtml(normalized.weather)}" placeholder="天气" /><input class="pixel-input" name="tags" value="${escapeHtml(tagsValue(item))}" placeholder="标签，用逗号分隔" /><select class="pixel-input" name="visibility"><option value="private" ${normalized.visibility === "private" ? "selected" : ""}>private</option><option value="public" ${normalized.visibility === "public" ? "selected" : ""}>public</option><option value="hidden" ${normalized.visibility === "hidden" ? "selected" : ""}>hidden</option></select><select class="pixel-input" name="status"><option value="active" ${normalized.status === "active" ? "selected" : ""}>active</option><option value="archived" ${normalized.status === "archived" ? "selected" : ""}>archived</option><option value="trashed" ${normalized.status === "trashed" ? "selected" : ""}>trashed</option></select><label class="folder-encrypt-toggle"><input name="isFavorite" type="checkbox" ${normalized.isFavorite ? "checked" : ""} />重点藏品</label>`;
 }
 
 function formDataToObject(form) {
@@ -1068,6 +1076,46 @@ function renderAudios(targetId = "audio-list", items = filtered("audios", siteDa
   bindPagination(target);
 }
 
+function bookCoverMarkup(item) {
+  if (item.thumbnailPath) return `<img class="book-cover" src="${escapeHtml(item.thumbnailPath)}" alt="${escapeHtml(item.title)}" loading="lazy" />`;
+  return `<div class="book-cover book-cover-fallback" aria-hidden="true">BOOK</div>`;
+}
+
+function bookCard(item) {
+  const ext = (item.filename || "").split(".").pop().toUpperCase();
+  const edit = canManage() && item.managed ? `<form class="edit-form compact-edit" data-edit-media="${escapeHtml(fileKey("books", item.filename))}"><input class="pixel-input" name="title" value="${escapeHtml(item.title)}" placeholder="书名" /><input class="pixel-input" name="author" value="${escapeHtml(item.author || "")}" placeholder="作者" /><input class="pixel-input" name="description" value="${escapeHtml(item.description)}" placeholder="简介 / 读后感" /><select class="pixel-input" name="category">${categoryOptions("books", item.category || "默认")}</select><input class="pixel-input" name="tags" value="${escapeHtml(tagsValue(item))}" placeholder="标签，用逗号分隔" /><button class="pixel-button secondary" type="submit">保存档案</button><button class="danger-button" data-delete-book="${escapeHtml(item.filename)}" type="button">移入废弃区</button></form>` : "";
+  return `<article class="book-item">${batchCheckbox("books", item)}<a class="book-cover-link" href="${itemDetailUrl("books", item)}">${bookCoverMarkup(item)}</a><div class="book-body"><div class="meta-line">${escapeHtml(item.museumId || "未编号")} · ${escapeHtml(ext || "BOOK")} · ${escapeHtml(item.duration || "")}</div><h3>${escapeHtml(item.title)}</h3><p class="book-author">${item.author ? "作者：" + escapeHtml(item.author) : "作者未登记"}</p><p>${escapeHtml(item.description)}</p><div class="book-actions"><a class="pixel-button secondary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener">打开 / 下载</a><a class="text-link" href="${itemDetailUrl("books", item)}">查看藏品档案 →</a></div>${edit}</div></article>`;
+}
+
+function bindBookDeleteButtons(scope) {
+  scope.querySelectorAll("[data-delete-book]").forEach((button) => {
+    button.addEventListener("click", async () => {
+      const filename = button.dataset.deleteBook;
+      if (!filename || !confirm(`确定把书籍藏品移入废弃区：${filename}？`)) return;
+      button.disabled = true;
+      try {
+        applyServerPayload(await requestApi(`/api/books/${encodeURIComponent(filename)}`, { method: "DELETE" }));
+      } catch (error) {
+        alert(`移入废弃区失败：${error.message}`);
+        button.disabled = false;
+      }
+    });
+  });
+}
+
+function renderBooks(targetId = "book-list", items = filtered("books", siteData.books)) {
+  const target = byId(targetId);
+  if (!target) return;
+  const usePagination = targetId === "book-list";
+  const page = usePagination ? pagedItems("books", items) : { items, page: 1, totalPages: 1, total: items.length };
+  target.innerHTML = page.items.map(bookCard).join("") || `<article class="log-item"><h3>当前展区暂无书籍</h3><p>可以切换展区或在上方登记电子书（PDF / EPUB / MOBI）。</p></article>`;
+  if (usePagination) target.insertAdjacentHTML("beforeend", paginationMarkup("books", page.page, page.totalPages, page.total));
+  bindMediaEditForms(target);
+  bindBookDeleteButtons(target);
+  bindBatchSelection(target);
+  bindPagination(target);
+}
+
 function logFormMarkup(item = {}) {
   return `<form class="log-edit-form edit-form" data-log-form="${escapeHtml(item.id || "")}"><input class="pixel-input" name="date" type="date" value="${escapeHtml(item.date || new Date().toISOString().slice(0, 10))}" /><input class="pixel-input" name="title" value="${escapeHtml(item.title || "")}" placeholder="日志标题" /><input class="pixel-input" name="summary" value="${escapeHtml(item.summary || "")}" placeholder="日志内容/摘要" /><input class="pixel-input" name="mood" value="${escapeHtml(item.mood || "")}" placeholder="心情" /><input class="pixel-input" name="weather" value="${escapeHtml(item.weather || "")}" placeholder="天气" /><input class="pixel-input" name="tags" value="${escapeHtml(tagsValue(item))}" placeholder="标签，用逗号分隔" /><button class="pixel-button secondary" type="submit">${item.id ? "保存日志" : "新增日志"}</button>${item.id ? `<button class="danger-button" data-log-delete="${escapeHtml(item.id)}" type="button">删除日志</button>` : ""}</form>`;
 }
@@ -1311,13 +1359,16 @@ function renderStatsPanel() {
     videos: { count: siteData.videos.length, size: 0 },
     photos: { count: siteData.photos.length, size: 0 },
     audios: { count: siteData.audios.length, size: 0 },
+    books: { count: siteData.books.length, size: 0 },
     logs: { count: siteData.logs.length },
     latestUpload: "暂无"
   };
+  const booksStat = stats.books || { count: siteData.books.length, size: 0 };
   target.innerHTML = `
     <div class="stat-box pixel-card"><span>影像碎片</span><strong>${stats.videos.count}</strong><em>${formatBytes(stats.videos.size)}</em></div>
     <div class="stat-box pixel-card"><span>视觉残片</span><strong>${stats.photos.count}</strong><em>${formatBytes(stats.photos.size)}</em></div>
     <div class="stat-box pixel-card"><span>声音碎片</span><strong>${stats.audios.count}</strong><em>${formatBytes(stats.audios.size)}</em></div>
+    <div class="stat-box pixel-card"><span>纸页藏书</span><strong>${booksStat.count}</strong><em>${formatBytes(booksStat.size)}</em></div>
     <div class="stat-box pixel-card"><span>馆藏日志</span><strong>${stats.logs.count}</strong><em>最近：${escapeHtml(stats.latestUpload)}</em></div>`;
 }
 
@@ -1325,6 +1376,7 @@ function renderAll() {
   renderCategoryManager("videos");
   renderCategoryManager("photos");
   renderCategoryManager("audios");
+  renderCategoryManager("books");
   renderBatchManagers();
   renderStatsPanel();
   renderVideos();
@@ -1334,6 +1386,8 @@ function renderAll() {
   renderPhotos("home-photo-list", siteData.photos.slice(0, 4));
   renderAudios();
   renderAudios("home-audio-list", siteData.audios.slice(0, 2));
+  renderBooks();
+  renderBooks("home-book-list", siteData.books.slice(0, 4));
   renderLogs();
   renderLogs("home-log-list", siteData.logs.slice(0, 3));
   renderTrash();
@@ -1350,6 +1404,7 @@ function applyServerPayload(payload) {
   if (Array.isArray(data.videos)) siteData.videos = data.videos.map(normalizeServerVideo);
   if (Array.isArray(data.photos)) siteData.photos = data.photos.map(normalizeServerPhoto);
   if (Array.isArray(data.audios)) siteData.audios = data.audios.map(normalizeServerAudio);
+  if (Array.isArray(data.books)) siteData.books = data.books.map(normalizeServerBook);
   if (Array.isArray(data.logs)) siteData.logs = data.logs;
     if (data.stats) siteData.stats = data.stats;
   if (Array.isArray(data.trash)) siteData.trash = data.trash;
@@ -1387,7 +1442,7 @@ async function clearTrashItems() {
 }
 
 function trashTypeLabel(type) {
-  return ({ videos: "影像碎片", photos: "视觉残片", audios: "声音碎片" })[type] || type || "藏品";
+  return ({ videos: "影像碎片", photos: "视觉残片", audios: "声音碎片", books: "纸页藏书" })[type] || type || "藏品";
 }
 
 function trashCard(item) {
@@ -1550,6 +1605,29 @@ function bindUploadEvents() {
   const videoUploadInput = byId("video-upload");
   const photoUploadInput = byId("photo-upload");
   const audioUploadInput = byId("audio-upload");
+  const bookUploadInput = byId("book-upload");
+  if (bookUploadInput) bookUploadInput.addEventListener("change", async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (!files.length) return;
+    if (canUseApi) {
+      const formData = new FormData();
+      appendRegistrationFields(formData, bookUploadInput);
+      files.forEach((file) => formData.append("books", file));
+      try {
+        const result = await uploadWithProgress("/api/books", formData, "book-upload-status", "书籍上传完成，正在刷新列表...");
+        applyServerPayload(result);
+        if (redirectToUploadedItem("books", result)) return;
+        setUploadStatus(`已登记 ${result.saved.length} 本书到 assets/books。${result.skipped?.length ? `跳过 ${result.skipped.length} 个不支持文件。` : ""}`, "book-upload-status");
+      } catch (error) {
+        setUploadStatus(`书籍保存失败：${error.message}`, "book-upload-status");
+      } finally {
+        bookUploadInput.value = "";
+      }
+      return;
+    }
+    setUploadStatus("当前是静态 file 页面，书籍需要通过 npm start 启动后才能上传。", "book-upload-status");
+    bookUploadInput.value = "";
+  });
   if (videoUploadInput) videoUploadInput.addEventListener("change", async (event) => {
     const files = Array.from(event.target.files || []);
     if (!files.length) return;
@@ -1672,6 +1750,11 @@ function mediaPreviewMarkup(type, item) {
   if (type === "photos") return `<img class="item-preview-image" src="${escapeHtml(item.src)}" alt="${escapeHtml(item.title)}" />`;
   if (type === "videos") return `<video class="pixel-video large-video" controls preload="metadata" playsinline src="${escapeHtml(item.src)}"></video>`;
   if (type === "audios") return `<audio controls preload="metadata" src="${escapeHtml(item.src)}"></audio>`;
+  if (type === "books") {
+    const isPdf = String(item.src || "").toLowerCase().endsWith(".pdf");
+    const viewer = isPdf ? `<iframe class="book-viewer" src="${escapeHtml(item.src)}" title="${escapeHtml(item.title)}"></iframe>` : `<a class="book-cover-link" href="${escapeHtml(item.src)}" target="_blank" rel="noopener">${bookCoverMarkup(item)}</a>`;
+    return `<div class="book-preview">${viewer}<a class="pixel-button secondary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener">打开 / 下载电子书</a></div>`;
+  }
   return `<article class="log-item"><p>${escapeHtml(item.summary || "生活日志藏品")}</p></article>`;
 }
 
@@ -1849,6 +1932,146 @@ async function loadViewStatus() {
   }
 }
 
+let diaryEntries = [];
+let diaryEditingId = "";
+
+function diaryEntryCard(entry) {
+  const tags = normalizeTags(entry.tags);
+  const body = escapeHtml(entry.body || "").replace(/\n/g, "<br />");
+  return `<article class="log-item diary-entry"><time>${escapeHtml(entry.date)}</time><h3>${escapeHtml(entry.title)}</h3><p class="diary-body-text">${body || "（空白）"}</p><div class="log-meta"><span>心情：${escapeHtml(entry.mood || "未记录")}</span><span>天气：${escapeHtml(entry.weather || "未记录")}</span>${tags.map((tag) => `<span>#${escapeHtml(tag)}</span>`).join("")}</div><div class="page-actions"><button class="pixel-button tertiary" data-diary-edit="${escapeHtml(entry.id)}" type="button">编辑</button><button class="danger-button" data-diary-delete="${escapeHtml(entry.id)}" type="button">删除</button></div></article>`;
+}
+
+function renderDiaryEntries() {
+  const target = byId("diary-entries");
+  if (!target) return;
+  target.innerHTML = diaryEntries.map(diaryEntryCard).join("") || `<article class="log-item"><h3>还没有日记</h3><p>在上方写下第一篇私人日记吧。</p></article>`;
+  target.querySelectorAll("[data-diary-edit]").forEach((button) => button.addEventListener("click", () => startDiaryEdit(button.dataset.diaryEdit)));
+  target.querySelectorAll("[data-diary-delete]").forEach((button) => button.addEventListener("click", () => deleteDiaryEntry(button.dataset.diaryDelete)));
+}
+
+function resetDiaryForm() {
+  diaryEditingId = "";
+  const form = byId("diary-form");
+  if (form) form.reset();
+  const dateInput = byId("diary-date");
+  if (dateInput) dateInput.value = new Date().toISOString().slice(0, 10);
+  const idInput = byId("diary-entry-id");
+  if (idInput) idInput.value = "";
+  const editorTitle = byId("diary-editor-title");
+  if (editorTitle) editorTitle.textContent = "写一篇新日记";
+  const saveButton = byId("diary-save");
+  if (saveButton) saveButton.textContent = "保存日记";
+  byId("diary-cancel")?.classList.add("hidden");
+}
+
+function startDiaryEdit(id) {
+  const entry = diaryEntries.find((item) => item.id === id);
+  if (!entry) return;
+  diaryEditingId = id;
+  byId("diary-entry-id").value = id;
+  byId("diary-date").value = entry.date || "";
+  byId("diary-title").value = entry.title || "";
+  byId("diary-body").value = entry.body || "";
+  byId("diary-mood").value = entry.mood || "";
+  byId("diary-weather").value = entry.weather || "";
+  byId("diary-tags").value = normalizeTags(entry.tags).join(", ");
+  byId("diary-editor-title").textContent = "编辑日记";
+  byId("diary-save").textContent = "保存修改";
+  byId("diary-cancel")?.classList.remove("hidden");
+  byId("diary-app")?.scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+async function deleteDiaryEntry(id) {
+  if (!id || !confirm("确定删除这篇日记？此操作不可恢复。")) return;
+  try {
+    const data = await requestApi(`/api/diary/${encodeURIComponent(id)}`, { method: "DELETE" });
+    diaryEntries = data.entries || [];
+    if (diaryEditingId === id) resetDiaryForm();
+    renderDiaryEntries();
+  } catch (error) {
+    alert(`删除日记失败：${error.message}`);
+  }
+}
+
+async function loadDiaryEntries() {
+  try {
+    const data = await requestApi("/api/diary");
+    diaryEntries = data.entries || [];
+    renderDiaryEntries();
+  } catch (error) {
+    console.info("日记加载失败。", error);
+  }
+}
+
+function showDiaryApp() {
+  byId("diary-lock")?.classList.add("hidden");
+  byId("diary-app")?.classList.remove("hidden");
+  resetDiaryForm();
+  loadDiaryEntries();
+}
+
+async function initDiaryPage() {
+  if (!document.body || document.body.dataset.diaryPage !== "1") return;
+  const unlockForm = byId("diary-unlock-form");
+  const diaryForm = byId("diary-form");
+  const cancelButton = byId("diary-cancel");
+  const lockAgain = byId("diary-lock-again");
+  if (cancelButton) cancelButton.addEventListener("click", resetDiaryForm);
+  if (lockAgain) lockAgain.addEventListener("click", async () => {
+    try { await requestApi("/api/diary-lock", { method: "POST" }); } catch (error) { /* ignore */ }
+    location.reload();
+  });
+  if (unlockForm) unlockForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const status = byId("diary-lock-status");
+    const password = byId("diary-password").value;
+    if (status) status.textContent = "解锁中…";
+    try {
+      await requestApi("/api/diary-unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password }) });
+      if (status) status.textContent = "";
+      byId("diary-password").value = "";
+      showDiaryApp();
+    } catch (error) {
+      if (status) status.textContent = `解锁失败：${error.message}`;
+    }
+  });
+  if (diaryForm) diaryForm.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const status = byId("diary-form-status");
+    const payload = {
+      date: byId("diary-date").value,
+      title: byId("diary-title").value,
+      body: byId("diary-body").value,
+      mood: byId("diary-mood").value,
+      weather: byId("diary-weather").value,
+      tags: byId("diary-tags").value
+    };
+    if (status) status.textContent = "保存中…";
+    try {
+      const url = diaryEditingId ? `/api/diary/${encodeURIComponent(diaryEditingId)}` : "/api/diary";
+      const method = diaryEditingId ? "PATCH" : "POST";
+      const data = await requestApi(url, { method, headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload) });
+      diaryEntries = data.entries || [];
+      resetDiaryForm();
+      renderDiaryEntries();
+      if (status) status.textContent = "已保存。";
+    } catch (error) {
+      if (status) status.textContent = `保存失败：${error.message}`;
+    }
+  });
+  if (!canUseApi) {
+    const status = byId("diary-lock-status");
+    if (status) status.textContent = "请通过 npm start 启动本地服务后使用私人日记。";
+    return;
+  }
+  try {
+    const data = await requestApi("/api/diary-status");
+    if (data.unlocked) showDiaryApp();
+  } catch (error) {
+    console.info("日记状态不可用。", error);
+  }
+}
+
 initManageMode();
 renderAll();
 bindUploadEvents();
@@ -1859,6 +2082,7 @@ bindTimelineFilter();
 bindTagsFilters();
 bindVideoShortcuts();
 bindDragUpload();
+initDiaryPage();
 loadServerMedia();
 loadAdminStatus();
 loadViewStatus();

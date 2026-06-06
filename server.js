@@ -26,6 +26,7 @@ const LEGACY_DB_PATH = path.join(ROOT_DIR, ".media-db.json");
 const SESSION_COOKIE = "media_hub_session";
 const VIEW_SESSION_COOKIE = "media_hub_view_session";
 const ADMIN_SESSION_COOKIE = "media_hub_admin_session";
+const DIARY_SESSION_COOKIE = "media_hub_diary_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
 
 loadEnvFile();
@@ -37,12 +38,15 @@ const THUMB_DIR = resolveConfiguredDir(process.env.THUMB_ROOT || "./thumbnails")
 const DB_PATH = path.join(DATA_DIR, "media-db.json");
 const LOGS_PATH = path.join(DATA_DIR, "logs.json");
 const BACKUP_DIR = path.join(DATA_DIR, "backups");
+const DIARY_PATH = path.join(DATA_DIR, "diary.json");
 const VIDEO_DIR = path.join(ASSETS_DIR, "video");
 const PHOTO_DIR = path.join(ASSETS_DIR, "photos");
 const AUDIO_DIR = path.join(ASSETS_DIR, "audio");
+const BOOK_DIR = path.join(ASSETS_DIR, "books");
 const MEDIA_HUB_PASSWORD = process.env.MEDIA_HUB_PASSWORD || "123456";
 const MEDIA_HUB_VIEW_PASSWORD = process.env.MEDIA_HUB_VIEW_PASSWORD || "view-123456";
 const MEDIA_HUB_ADMIN_PASSWORD = process.env.MEDIA_HUB_ADMIN_PASSWORD || "admin-123456";
+const MEDIA_HUB_DIARY_PASSWORD = process.env.MEDIA_HUB_DIARY_PASSWORD || "diary-123456";
 const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash("sha256").update(`${ROOT_DIR}:private-media-hub`).digest("hex");
 const MAX_UPLOAD_BYTES = Number(process.env.MEDIA_HUB_MAX_UPLOAD_BYTES || 1024 * 1024 * 1024 * 8);
 const COOKIE_SECURE = String(process.env.COOKIE_SECURE || "false").toLowerCase() === "true";
@@ -57,6 +61,9 @@ const TRASH_PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000;
 
 if (MEDIA_HUB_VIEW_PASSWORD === MEDIA_HUB_PASSWORD || MEDIA_HUB_ADMIN_PASSWORD === MEDIA_HUB_PASSWORD) {
   throw new Error("MEDIA_HUB_VIEW_PASSWORD 和 MEDIA_HUB_ADMIN_PASSWORD 必须与 MEDIA_HUB_PASSWORD 不一致");
+}
+if (MEDIA_HUB_DIARY_PASSWORD === MEDIA_HUB_PASSWORD) {
+  throw new Error("MEDIA_HUB_DIARY_PASSWORD 必须与 MEDIA_HUB_PASSWORD 不一致");
 }
 
 const mediaTypes = {
@@ -77,6 +84,12 @@ const mediaTypes = {
     trashDir: path.join(TRASH_DIR, "audio"),
     urlPrefix: "assets/audio",
     extensions: new Set([".mp3", ".wav", ".flac", ".m4a", ".ogg"])
+  },
+  books: {
+    dir: BOOK_DIR,
+    trashDir: path.join(TRASH_DIR, "books"),
+    urlPrefix: "assets/books",
+    extensions: new Set([".pdf", ".epub", ".mobi", ".azw3"])
   }
 };
 
@@ -84,10 +97,12 @@ const defaultDb = {
   videos: {},
   photos: {},
   audios: {},
+  books: {},
   categories: {
     videos: ["默认"],
     photos: ["默认"],
-    audios: ["默认"]
+    audios: ["默认"],
+    books: ["默认"]
   },
   categoryMeta: {
     photos: {}
@@ -100,6 +115,8 @@ const defaultLogs = [
   { date: "2026-05-18", title: "整理照片素材", summary: "将相册中的精选图片放进 assets/photos，作为首页照片墙的默认展示内容。", mood: "专注", weather: "晴", tags: ["照片"] },
   { date: "2026-05-16", title: "视频归档计划", summary: "先用本地 MOV 文件测试播放体验，之后再按日期、地点或主题扩展分类。", mood: "期待", weather: "多云", tags: ["视频"] }
 ];
+
+const defaultDiary = [];
 
 function loadEnvFile() {
   if (!fs.existsSync(ENV_PATH)) return;
@@ -127,7 +144,7 @@ function ensureDirectories() {
     fs.mkdirSync(type.dir, { recursive: true });
     fs.mkdirSync(type.trashDir, { recursive: true });
   });
-  ["video", "photos", "audio"].forEach((name) => fs.mkdirSync(path.join(THUMB_DIR, name), { recursive: true }));
+  ["video", "photos", "audio", "books"].forEach((name) => fs.mkdirSync(path.join(THUMB_DIR, name), { recursive: true }));
 }
 
 function normalizePhotoCategoryMeta(categories, rawMeta = {}) {
@@ -151,7 +168,7 @@ function normalizeBoolean(value, fallback = false) {
 }
 
 function objectTypeFor(typeName) {
-  return ({ videos: "video", photos: "photo", audios: "audio" })[typeName] || "object";
+  return ({ videos: "video", photos: "photo", audios: "audio", books: "book" })[typeName] || "object";
 }
 
 function normalizeDateValue(value, fallback = new Date()) {
@@ -176,6 +193,7 @@ function normalizeMediaMeta(typeName, filename, meta = {}, fallbackDate = new Da
     collectionType: normalizeCollectionType(meta.collectionType, typeName),
     objectType: String(meta.objectType || objectTypeFor(typeName)).trim(),
     recordDate: normalizeDateValue(meta.recordDate || meta.createdAt, fallbackDate),
+    author: String(meta.author || "").trim(),
     location: String(meta.location || "").trim(),
     mood: String(meta.mood || "").trim(),
     weather: String(meta.weather || "").trim(),
@@ -196,12 +214,14 @@ function normalizeDb(parsed = {}) {
   const categories = {
     videos: parsed.categories?.videos?.length ? parsed.categories.videos : ["默认"],
     photos: parsed.categories?.photos?.length ? parsed.categories.photos : ["默认"],
-    audios: parsed.categories?.audios?.length ? parsed.categories.audios : ["默认"]
+    audios: parsed.categories?.audios?.length ? parsed.categories.audios : ["默认"],
+    books: parsed.categories?.books?.length ? parsed.categories.books : ["默认"]
   };
   return {
     videos: normalizeMediaBucket("videos", parsed.videos || {}),
     photos: normalizeMediaBucket("photos", parsed.photos || {}),
     audios: normalizeMediaBucket("audios", parsed.audios || {}),
+    books: normalizeMediaBucket("books", parsed.books || {}),
     categories,
     categoryMeta: {
       photos: normalizePhotoCategoryMeta(categories.photos, parsed.categoryMeta?.photos || {})
@@ -376,7 +396,7 @@ function monthFolder(date) {
 }
 
 function thumbTypeFolder(typeName) {
-  return ({ videos: "video", photos: "photos", audios: "audio" })[typeName] || typeName;
+  return ({ videos: "video", photos: "photos", audios: "audio", books: "books" })[typeName] || typeName;
 }
 
 function thumbnailUrl(typeName, filename) {
@@ -391,7 +411,7 @@ function defaultCollectionType(typeName) {
 }
 
 function museumIdFor(typeName, filename) {
-  const prefix = ({ videos: "VID", photos: "IMG", audios: "AUD" })[typeName] || "OBJ";
+  const prefix = ({ videos: "VID", photos: "IMG", audios: "AUD", books: "BOK" })[typeName] || "OBJ";
   const hash = crypto.createHash("sha1").update(`${typeName}:${filename}`).digest("hex").slice(0, 8).toUpperCase();
   return `MGM-${prefix}-${hash}`;
 }
@@ -424,6 +444,11 @@ function ensureThumbnail(typeName, sourcePath, filename, meta = {}) {
   fs.mkdirSync(path.dirname(targetPath), { recursive: true });
   if (!fs.existsSync(targetPath)) {
     if (typeName === "photos") generatePhotoThumbnail(sourcePath, targetPath);
+    else if (typeName === "books") {
+      const title = String(meta.title || path.basename(filename, path.extname(filename))).slice(0, 24);
+      const author = String(meta.author || "").slice(0, 24);
+      fs.writeFileSync(targetPath, `<svg xmlns="http://www.w3.org/2000/svg" width="480" height="640" viewBox="0 0 480 640"><rect width="480" height="640" fill="#1b1530"/><rect x="40" y="40" width="400" height="560" fill="#3b2f6b" stroke="#07050f" stroke-width="14"/><rect x="40" y="40" width="40" height="560" fill="#241c44" stroke="#07050f" stroke-width="14"/><text x="260" y="150" text-anchor="middle" font-family="monospace" font-size="40" font-weight="900" fill="#ffd166">BOOK</text><text x="260" y="330" text-anchor="middle" font-family="monospace" font-size="26" font-weight="700" fill="#73e8ff">${escapeXml(title)}</text><text x="260" y="380" text-anchor="middle" font-family="monospace" font-size="20" fill="#c7ff6b">${escapeXml(author)}</text></svg>`, "utf8");
+    }
     else {
       const label = typeName === "videos" ? "VIDEO" : "AUDIO";
       fs.writeFileSync(targetPath, `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360"><rect width="640" height="360" fill="#19142d"/><rect x="24" y="24" width="592" height="312" fill="#362b61" stroke="#07050f" stroke-width="12"/><text x="320" y="190" text-anchor="middle" font-family="monospace" font-size="56" font-weight="900" fill="#73e8ff">${label}</text><text x="320" y="240" text-anchor="middle" font-family="monospace" font-size="24" fill="#c7ff6b">${escapeXml(path.basename(filename))}</text></svg>`, "utf8");
@@ -459,6 +484,7 @@ function listMedia(typeName) {
         collectionType: meta.collectionType,
         objectType: meta.objectType,
         recordDate: meta.recordDate,
+        author: meta.author || "",
         location: meta.location,
         mood: meta.mood,
         weather: meta.weather,
@@ -482,11 +508,12 @@ function listMedia(typeName) {
 
 function buildStats(payload) {
   const sumSize = (items) => items.reduce((total, item) => total + Number(item.size || 0), 0);
-  const allMedia = [...payload.videos, ...payload.photos, ...payload.audios].sort((a, b) => b.updatedAt - a.updatedAt);
+  const allMedia = [...payload.videos, ...payload.photos, ...payload.audios, ...(payload.books || [])].sort((a, b) => b.updatedAt - a.updatedAt);
   return {
     videos: { count: payload.videos.length, size: sumSize(payload.videos) },
     photos: { count: payload.photos.length, size: sumSize(payload.photos) },
     audios: { count: payload.audios.length, size: sumSize(payload.audios) },
+    books: { count: (payload.books || []).length, size: sumSize(payload.books || []) },
     logs: { count: payload.logs.length },
     latestUpload: allMedia[0]?.updatedAt ? new Date(allMedia[0].updatedAt).toISOString().slice(0, 10) : "暂无"
   };
@@ -512,6 +539,7 @@ function buildResponsePayload(options = {}) {
     videos: listMedia("videos"),
     photos,
     audios: listMedia("audios"),
+    books: listMedia("books"),
     logs: readLogs(),
     categories: db.categories,
     categoryMeta: db.categoryMeta,
@@ -553,6 +581,11 @@ function unlockedViewFolders(request) {
 function hasAdminSession(request) {
   const cookies = parseCookies(request.headers.cookie || "");
   return isValidSession(cookies[ADMIN_SESSION_COOKIE]);
+}
+
+function hasDiarySession(request) {
+  const cookies = parseCookies(request.headers.cookie || "");
+  return isValidSession(cookies[DIARY_SESSION_COOKIE]);
 }
 
 function responsePayloadForRequest(request) {
@@ -835,6 +868,55 @@ function deleteLogEntry(id) {
   writeLogs(next);
 }
 
+function normalizeDiaryEntry(entry = {}) {
+  const now = new Date().toISOString();
+  return {
+    id: String(entry.id || crypto.randomUUID()),
+    date: String(entry.date || now.slice(0, 10)).slice(0, 10),
+    title: String(entry.title || "无题").trim() || "无题",
+    body: String(entry.body || "").replace(/\r\n/g, "\n"),
+    mood: String(entry.mood || "").trim(),
+    weather: String(entry.weather || "").trim(),
+    tags: Array.isArray(entry.tags) ? entry.tags.map(String).map((tag) => tag.trim()).filter(Boolean) : String(entry.tags || "").split(",").map((tag) => tag.trim()).filter(Boolean),
+    createdAt: entry.createdAt || now,
+    updatedAt: now
+  };
+}
+
+function readDiary() {
+  const entries = readJson(DIARY_PATH, defaultDiary);
+  return (Array.isArray(entries) ? entries : structuredClone(defaultDiary)).map(normalizeDiaryEntry);
+}
+
+function writeDiary(entries) {
+  backupJsonFile(DIARY_PATH, "diary");
+  fs.writeFileSync(DIARY_PATH, JSON.stringify(entries.map(normalizeDiaryEntry), null, 2), "utf8");
+}
+
+function createDiaryEntry(patch) {
+  const entries = readDiary();
+  const entry = normalizeDiaryEntry({ ...patch, id: crypto.randomUUID() });
+  entries.unshift(entry);
+  writeDiary(entries.slice(0, 1000));
+  return entry;
+}
+
+function updateDiaryEntry(id, patch) {
+  const entries = readDiary();
+  const index = entries.findIndex((entry) => entry.id === String(id || ""));
+  if (index === -1) throw createHttpError("DIARY_NOT_FOUND", "日记不存在", 404);
+  entries[index] = normalizeDiaryEntry({ ...entries[index], ...patch, id: entries[index].id, createdAt: entries[index].createdAt });
+  writeDiary(entries);
+  return entries[index];
+}
+
+function deleteDiaryEntry(id) {
+  const entries = readDiary();
+  const next = entries.filter((entry) => entry.id !== String(id || ""));
+  if (next.length === entries.length) throw createHttpError("DIARY_NOT_FOUND", "日记不存在", 404);
+  writeDiary(next);
+}
+
 function updateMeta(typeName, filename, patch) {
   const { filename: safeFilename, targetPath } = resolveManagedPath(typeName, filename);
   if (!fs.existsSync(targetPath)) throw createHttpError("FILE_NOT_FOUND", "文件不存在", 404);
@@ -846,6 +928,7 @@ function updateMeta(typeName, filename, patch) {
     collectionType: normalizeCollectionType(patch.collectionType || db[typeName][safeFilename]?.collectionType, typeName),
     objectType: String(patch.objectType || db[typeName][safeFilename]?.objectType || objectTypeFor(typeName)).trim(),
     recordDate: normalizeDateValue(patch.recordDate || db[typeName][safeFilename]?.recordDate || db[typeName][safeFilename]?.createdAt),
+    author: String(patch.author ?? db[typeName][safeFilename]?.author ?? "").trim(),
     location: String(patch.location ?? db[typeName][safeFilename]?.location ?? "").trim(),
     mood: String(patch.mood ?? db[typeName][safeFilename]?.mood ?? "").trim(),
     weather: String(patch.weather ?? db[typeName][safeFilename]?.weather ?? "").trim(),
@@ -881,6 +964,7 @@ function readUploadMetaField(fields, part, typeName) {
   if (part.fieldname === "collectionType") fields.collectionType = normalizeCollectionType(value, typeName);
   if (part.fieldname === "objectType") fields.objectType = value || objectTypeFor(typeName);
   if (part.fieldname === "recordDate") fields.recordDate = normalizeDateValue(value);
+  if (part.fieldname === "author") fields.author = value;
   if (part.fieldname === "location") fields.location = value;
   if (part.fieldname === "mood") fields.mood = value;
   if (part.fieldname === "weather") fields.weather = value;
@@ -901,6 +985,7 @@ function uploadMetaPatch(typeName, filename, fields = {}) {
     collectionType: fields.collectionType || defaultCollectionType(typeName),
     objectType: fields.objectType || objectTypeFor(typeName),
     recordDate: fields.recordDate || normalizeDateValue(null),
+    author: fields.author || "",
     location: fields.location || "",
     mood: fields.mood || "",
     weather: fields.weather || "",
@@ -1041,7 +1126,8 @@ function purgeExpiredTrash(retentionDays = TRASH_RETENTION_DAYS) {
 const allowedMimes = {
   videos: [/^video\//, /^application\/octet-stream$/],
   photos: [/^image\//],
-  audios: [/^audio\//, /^application\/ogg$/, /^application\/octet-stream$/]
+  audios: [/^audio\//, /^application\/ogg$/, /^application\/octet-stream$/],
+  books: [/^application\/pdf$/, /^application\/epub\+zip$/, /^application\/x-mobipocket-ebook$/, /^application\/vnd\.amazon\.ebook$/, /^application\/zip$/, /^application\/octet-stream$/]
 };
 
 function validateUpload(typeName, filename, mimetype = "") {
@@ -1055,7 +1141,7 @@ function validateUpload(typeName, filename, mimetype = "") {
 }
 
 function hasValidSignature(typeName, filePath, ext) {
-  const buffer = fs.readFileSync(filePath).subarray(0, 32);
+  const buffer = fs.readFileSync(filePath).subarray(0, 68);
   const ascii = buffer.toString("ascii");
   const hex = buffer.toString("hex");
   if (typeName === "photos") {
@@ -1074,6 +1160,11 @@ function hasValidSignature(typeName, filePath, ext) {
     if (ext === ".flac") return ascii.startsWith("fLaC");
     if (ext === ".ogg") return ascii.startsWith("OggS");
     if (ext === ".m4a") return ascii.slice(4, 8) === "ftyp";
+  }
+  if (typeName === "books") {
+    if (ext === ".pdf") return ascii.startsWith("%PDF");
+    if (ext === ".epub") return hex.startsWith("504b0304") || hex.startsWith("504b0506") || hex.startsWith("504b0708");
+    if ([".mobi", ".azw3"].includes(ext)) return ascii.slice(60, 68) === "BOOKMOBI" || ascii.slice(60, 68) === "TPZ3TPZ3" || ascii.startsWith("TPZ");
   }
   return false;
 }
@@ -1144,20 +1235,32 @@ function setAdminSessionCookie(reply) {
   reply.header("Set-Cookie", `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; ${COOKIE_ATTRIBUTES}`);
 }
 
+function setDiarySessionCookie(reply) {
+  const token = createSessionToken();
+  reply.header("Set-Cookie", `${DIARY_SESSION_COOKIE}=${encodeURIComponent(token)}; ${COOKIE_ATTRIBUTES}`);
+}
+
 function clearSessionCookie(reply) {
   reply.headers({
     "Set-Cookie": [
       `${SESSION_COOKIE}=; ${EXPIRED_COOKIE_ATTRIBUTES}`,
       `${VIEW_SESSION_COOKIE}=; ${EXPIRED_COOKIE_ATTRIBUTES}`,
-      `${ADMIN_SESSION_COOKIE}=; ${EXPIRED_COOKIE_ATTRIBUTES}`
+      `${ADMIN_SESSION_COOKIE}=; ${EXPIRED_COOKIE_ATTRIBUTES}`,
+      `${DIARY_SESSION_COOKIE}=; ${EXPIRED_COOKIE_ATTRIBUTES}`
     ]
   });
+}
+
+function isDiaryRoute(request) {
+  const pathname = request.url.split("?")[0];
+  return pathname === "/api/diary" || pathname.startsWith("/api/diary/");
 }
 
 function isAdminRoute(request) {
   if (!request.url.startsWith("/api/")) return false;
   if (["GET", "HEAD"].includes(request.method)) return false;
   const pathname = request.url.split("?")[0];
+  if (isDiaryRoute(request) || pathname === "/api/diary-unlock" || pathname === "/api/diary-lock") return false;
   return !["/api/login", "/api/logout", "/api/view-unlock", "/api/admin-unlock"].includes(pathname);
 }
 
@@ -1189,6 +1292,7 @@ if (!fs.existsSync(DB_PATH)) {
   else writeDb(defaultDb);
 }
 if (!fs.existsSync(LOGS_PATH)) writeLogs(defaultLogs);
+if (!fs.existsSync(DIARY_PATH)) writeDiary(defaultDiary);
 
 if (TRASH_RETENTION_DAYS > 0) {
   try {
@@ -1222,6 +1326,10 @@ fastify.addHook("onRequest", async (request, reply) => {
   if (isPublicPath(request.url)) return;
   const cookies = parseCookies(request.headers.cookie || "");
   if (isValidSession(cookies[SESSION_COOKIE])) {
+    if (isDiaryRoute(request) && !hasDiarySession(request)) {
+      reply.code(403).send({ success: false, message: "请先解锁日记", code: "DIARY_REQUIRED" });
+      return;
+    }
     if (isAdminRoute(request) && !hasAdminSession(request)) {
       reply.code(403).send({ success: false, message: "请先解锁管理权限", code: "ADMIN_REQUIRED" });
     }
@@ -1335,6 +1443,18 @@ fastify.register(staticPlugin, {
 });
 
 fastify.register(staticPlugin, {
+  root: BOOK_DIR,
+  prefix: "/assets/books/",
+  decorateReply: false
+});
+
+fastify.register(staticPlugin, {
+  root: path.join(THUMB_DIR, "books"),
+  prefix: "/thumbnails/books/",
+  decorateReply: false
+});
+
+fastify.register(staticPlugin, {
   root: PUBLIC_DIR,
   prefix: "/"
 });
@@ -1425,6 +1545,39 @@ fastify.patch("/api/logs/:id", async (request, reply) => {
 fastify.delete("/api/logs/:id", async (request, reply) => {
   deleteLogEntry(request.params.id);
   reply.send(ok(responsePayloadForRequest(request)));
+});
+
+fastify.post("/api/diary-unlock", async (request, reply) => {
+  const password = String(request.body?.password || "");
+  if (password !== MEDIA_HUB_DIARY_PASSWORD) {
+    return reply.code(403).send({ success: false, message: "日记密码错误", code: "INVALID_DIARY_PASSWORD" });
+  }
+  setDiarySessionCookie(reply);
+  reply.send(ok({ unlocked: true }));
+});
+
+fastify.get("/api/diary-status", async (request) => ok({ unlocked: hasDiarySession(request) }));
+
+fastify.post("/api/diary-lock", async (request, reply) => {
+  reply.header("Set-Cookie", `${DIARY_SESSION_COOKIE}=; ${EXPIRED_COOKIE_ATTRIBUTES}`);
+  reply.send(ok({ unlocked: false }));
+});
+
+fastify.get("/api/diary", async (request) => ok({ entries: readDiary() }));
+
+fastify.post("/api/diary", async (request, reply) => {
+  const entry = createDiaryEntry(request.body || {});
+  reply.send(ok({ entry, entries: readDiary() }));
+});
+
+fastify.patch("/api/diary/:id", async (request, reply) => {
+  const entry = updateDiaryEntry(request.params.id, request.body || {});
+  reply.send(ok({ entry, entries: readDiary() }));
+});
+
+fastify.delete("/api/diary/:id", async (request, reply) => {
+  deleteDiaryEntry(request.params.id);
+  reply.send(ok({ entries: readDiary() }));
 });
 
 fastify.patch("/api/media", async (request, reply) => {
@@ -1523,6 +1676,35 @@ fastify.post("/api/audios", async (request, reply) => {
     }
   }
   reply.send(ok({ saved, skipped, ...responsePayloadForRequest(request) }));
+});
+
+fastify.post("/api/books", async (request, reply) => {
+  const parts = request.parts();
+  const saved = [];
+  const skipped = [];
+  const fields = { collectionType: defaultCollectionType("books"), objectType: objectTypeFor("books"), recordDate: normalizeDateValue(null), visibility: "private", status: "active" };
+  for await (const part of parts) {
+    if (part.type === "field") {
+      readUploadMetaField(fields, part, "books");
+      continue;
+    }
+    if (part.type !== "file") continue;
+    try {
+      const savedName = await saveValidatedUpload(part, "books", BOOK_DIR, "book.pdf");
+      saved.push(savedName);
+      updateMeta("books", savedName, uploadMetaPatch("books", savedName, fields));
+      addSystemLog(`上传书籍 ${savedName}`, `保存到 assets/books/${savedName}，作者：${fields.author || "未知"}`, ["上传", "书籍"]);
+    } catch (error) {
+      part.file.resume();
+      skipped.push({ filename: part.filename, message: error.message });
+    }
+  }
+  reply.send(ok({ saved, skipped, ...responsePayloadForRequest(request) }));
+});
+
+fastify.delete("/api/books/:filename", async (request, reply) => {
+  moveToTrash("books", request.params.filename);
+  reply.send(ok(responsePayloadForRequest(request)));
 });
 
 fastify.delete("/api/photos/:filename", async (request, reply) => {

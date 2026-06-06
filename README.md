@@ -6,9 +6,11 @@
 
 ## 功能特性
 
-- 三级密码保护：`MEDIA_HUB_PASSWORD` 控制整站访问登录，`MEDIA_HUB_ADMIN_PASSWORD`（馆长密码）解锁备份、恢复、导出、废弃区彻底删除等管理操作，`MEDIA_HUB_VIEW_PASSWORD`（查看密码）用于单独解锁加密相册展柜。三个密码必须互不相同，否则服务启动会报错。
+- 四级密码保护：`MEDIA_HUB_PASSWORD` 控制整站访问登录，`MEDIA_HUB_ADMIN_PASSWORD`（馆长密码）解锁备份、恢复、导出、废弃区彻底删除等管理操作，`MEDIA_HUB_VIEW_PASSWORD`（查看密码）用于单独解锁加密相册展柜，`MEDIA_HUB_DIARY_PASSWORD`（日记密码）用于单独解锁独立的私人日记。查看 / 馆长 / 日记三个密码都必须与主密码不同，否则服务启动会报错。
+- 独立私人日记：新增 `diary.html`，使用独立的日记密码解锁，数据保存在独立文件 `data/diary.json`（含自动备份），与公开的「馆藏日志」完全分开。解锁后可写、查、改、删日记，字段含日期、标题、多行正文、心情、天气、标签，并可随时点击“锁定日记”重新加密。
+- 纸页藏书展区：新增 `books.html`，作为与照片 / 视频 / 音频并列的藏品类型，可上传电子书文件（PDF / EPUB / MOBI / AZW3）到 `assets/books`，附书名、作者、简介 / 读后感、展区、标签等元数据，列表与详情页可在线打开 PDF 或下载原文件。
 - 加密相册展柜：照片展区中的指定文件夹可标记为加密，未用查看密码解锁时不会出现在列表、详情、缩略图和 EXIF 接口中。
-- 路径安全校验：后端只允许操作配置媒体目录中的受支持媒体文件，默认是 `assets/video`、`assets/photos`、`assets/audio`。
+- 路径安全校验：后端只允许操作配置媒体目录中的受支持媒体文件，默认是 `assets/video`、`assets/photos`、`assets/audio`、`assets/books`。
 - 入馆登记校验：按视频、图片、音频分别限制扩展名，并校验 MIME 类型、常见文件头和最大上传体积；登记失败会清理临时文件。
 - 统一数据目录：藏品元数据与日志存储在 `data/` 目录，可通过 `.env` 迁移到数据盘或 NAS。
 - 缩略图/封面缓存：照片列表优先读取 `thumbnails/photos` 缓存，视频和音频使用像素风 SVG 占位封面。
@@ -219,6 +221,7 @@ npm install
 MEDIA_HUB_PASSWORD=123456
 MEDIA_HUB_VIEW_PASSWORD=view-123456
 MEDIA_HUB_ADMIN_PASSWORD=admin-123456
+MEDIA_HUB_DIARY_PASSWORD=diary-123456
 SESSION_SECRET=replace-with-a-long-random-secret
 MEDIA_HUB_MAX_UPLOAD_BYTES=8589934592
 MEDIA_HUB_TRASH_RETENTION_DAYS=30
@@ -229,7 +232,7 @@ TRASH_ROOT=./trash
 THUMB_ROOT=./thumbnails
 ```
 
-> **重要**：三个密码（`MEDIA_HUB_PASSWORD`、`MEDIA_HUB_VIEW_PASSWORD`、`MEDIA_HUB_ADMIN_PASSWORD`）必须互不相同，否则服务启动会报错。正式使用时务必修改为高强度密码。
+> **重要**：`MEDIA_HUB_VIEW_PASSWORD`、`MEDIA_HUB_ADMIN_PASSWORD`、`MEDIA_HUB_DIARY_PASSWORD` 都必须与 `MEDIA_HUB_PASSWORD` 不同，否则服务启动会报错。正式使用时务必修改为高强度密码。
 
 启动本地服务：
 
@@ -252,6 +255,8 @@ npm start
    - 视频：`assets/video`
    - 照片：`assets/photos`
    - 音频：`assets/audio`
+   - 电子书：`assets/books`
+7. 私人日记在 `diary.html`，需输入 `MEDIA_HUB_DIARY_PASSWORD` 单独解锁，数据保存在 `data/diary.json`，与馆藏日志分开。
 4. 普通浏览页只展示内容；点击影像碎片、视觉残片、声音碎片或馆藏日志页的“入馆登记”后，可编辑标题、描述、展区、标签并执行登记、删除等操作。
 5. 删除操作会先把文件移动到 `trash/`，不会立即物理删除；从首页“馆长后台”进入废弃区后可恢复、彻底销毁或清空废弃区。
 6. 在首页搜索框输入关键词，可搜索媒体和日志。
