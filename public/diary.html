@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>私人日记 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body data-diary-page="1">
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">PRIVATE DIARY</p>
+        <h1>私人日记</h1>
+        <span class="section-tag">独立加密 · 与馆藏日志分开</span>
+      </div>
+      <p class="hero-text">这里是独立加密的私人日记，需要单独的日记密码才能进入，数据保存在 data/diary.json，与公开的馆藏日志完全分开。</p>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card" id="diary-lock">
+        <div class="section-heading"><div><p class="eyebrow">LOCKED</p><h2>日记已加密</h2></div></div>
+        <p class="hero-text">请输入 .env 中配置的 MEDIA_HUB_DIARY_PASSWORD 解锁日记。</p>
+        <form class="login-form" id="diary-unlock-form">
+          <input class="pixel-input" id="diary-password" type="password" autocomplete="off" placeholder="日记密码" />
+          <button class="pixel-button" type="submit">解锁日记</button>
+        </form>
+        <p class="upload-tip" id="diary-lock-status"></p>
+      </section>
+
+      <section class="media-section pixel-card hidden" id="diary-app">
+        <div class="section-heading">
+          <div><p class="eyebrow">NEW ENTRY</p><h2 id="diary-editor-title">写一篇新日记</h2></div>
+          <button class="pixel-button tertiary" id="diary-lock-again" type="button">锁定日记</button>
+        </div>
+        <form class="log-edit-form edit-form" id="diary-form">
+          <input type="hidden" id="diary-entry-id" value="" />
+          <input class="pixel-input" id="diary-date" name="date" type="date" />
+          <input class="pixel-input" id="diary-title" name="title" placeholder="标题" />
+          <textarea class="pixel-input diary-textarea" id="diary-body" name="body" rows="8" placeholder="今天发生了什么…（支持多行）"></textarea>
+          <div class="registration-fields">
+            <input class="pixel-input" id="diary-mood" name="mood" placeholder="心情" />
+            <input class="pixel-input" id="diary-weather" name="weather" placeholder="天气" />
+            <input class="pixel-input" id="diary-tags" name="tags" placeholder="标签，用逗号分隔" />
+          </div>
+          <div class="page-actions">
+            <button class="pixel-button secondary" type="submit" id="diary-save">保存日记</button>
+            <button class="pixel-button tertiary hidden" type="button" id="diary-cancel">取消编辑</button>
+          </div>
+          <p class="upload-tip" id="diary-form-status"></p>
+        </form>
+
+        <div class="section-heading"><div><p class="eyebrow">ENTRIES</p><h2>日记列表</h2></div></div>
+        <div class="log-list" id="diary-entries"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>
