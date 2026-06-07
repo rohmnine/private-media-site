@@ -105,7 +105,8 @@ const defaultDb = {
     books: ["默认"]
   },
   categoryMeta: {
-    photos: {}
+    photos: {},
+    books: {}
   },
   trash: []
 };
@@ -155,6 +156,18 @@ function normalizePhotoCategoryMeta(categories, rawMeta = {}) {
       note: String(previous.note || "").trim(),
       folders: Array.isArray(previous.folders) ? previous.folders.filter(Boolean) : [],
       encryptedFolders: Array.isArray(previous.encryptedFolders) ? previous.encryptedFolders.filter(Boolean) : []
+    };
+    return meta;
+  }, {});
+}
+
+function normalizeBookCategoryMeta(categories, rawMeta = {}) {
+  return categories.reduce((meta, category) => {
+    const previous = rawMeta[category] || {};
+    meta[category] = {
+      cover: String(previous.cover || "").trim(),
+      note: String(previous.note || "").trim(),
+      encrypted: Boolean(previous.encrypted)
     };
     return meta;
   }, {});
@@ -224,7 +237,8 @@ function normalizeDb(parsed = {}) {
     books: normalizeMediaBucket("books", parsed.books || {}),
     categories,
     categoryMeta: {
-      photos: normalizePhotoCategoryMeta(categories.photos, parsed.categoryMeta?.photos || {})
+      photos: normalizePhotoCategoryMeta(categories.photos, parsed.categoryMeta?.photos || {}),
+      books: normalizeBookCategoryMeta(categories.books, parsed.categoryMeta?.books || {})
     },
     trash: Array.isArray(parsed.trash) ? parsed.trash : []
   };
@@ -527,6 +541,14 @@ function viewFolderKey(category = "默认", folder = "未归档") {
   return `${category}::${folder}`;
 }
 
+function isEncryptedBookCategory(db, category = "默认") {
+  return Boolean(db.categoryMeta.books?.[category]?.encrypted);
+}
+
+function bookCategoryKey(category = "默认") {
+  return `book::${category}`;
+}
+
 function buildResponsePayload(options = {}) {
   const db = readDb();
   const unlockedFolders = options.unlockedFolders || new Set();
@@ -535,11 +557,15 @@ function buildResponsePayload(options = {}) {
     const folder = item.folder || "未归档";
     return !isEncryptedPhotoFolder(db, category, folder) || unlockedFolders.has(viewFolderKey(category, folder));
   });
+  const books = listMedia("books").filter((item) => {
+    const category = item.category || "默认";
+    return !isEncryptedBookCategory(db, category) || unlockedFolders.has(bookCategoryKey(category));
+  });
   const payload = {
     videos: listMedia("videos"),
     photos,
     audios: listMedia("audios"),
-    books: listMedia("books"),
+    books,
     logs: readLogs(),
     categories: db.categories,
     categoryMeta: db.categoryMeta,
@@ -600,6 +626,23 @@ function findPhotoByFilename(filename) {
 function findPhotoByThumbnail(thumbnailName) {
   const clean = safeName(path.basename(String(thumbnailName || "")));
   return listMedia("photos").find((item) => path.basename(item.thumbnailPath || "") === clean) || null;
+}
+
+function findBookByFilename(filename) {
+  const clean = safeName(path.basename(String(filename || "")));
+  return listMedia("books").find((item) => item.filename === clean) || null;
+}
+
+function findBookByThumbnail(thumbnailName) {
+  const clean = safeName(path.basename(String(thumbnailName || "")));
+  return listMedia("books").find((item) => path.basename(item.thumbnailPath || "") === clean) || null;
+}
+
+function canAccessBook(request, book) {
+  if (!book) return false;
+  const db = readDb();
+  const category = book.category || "默认";
+  return !isEncryptedBookCategory(db, category) || unlockedViewFolders(request).has(bookCategoryKey(category));
 }
 
 function formatShutter(exposureTime) {
@@ -712,6 +755,15 @@ function addCategory(typeName, name, patch = {}) {
       encryptedFolders: Array.isArray(previous.encryptedFolders) ? previous.encryptedFolders : []
     };
   }
+  if (typeName === "books") {
+    const previous = db.categoryMeta.books[clean] || {};
+    db.categoryMeta.books[clean] = {
+      ...previous,
+      cover: String(patch.cover || previous.cover || "").trim(),
+      note: String(patch.note || previous.note || "").trim(),
+      encrypted: Boolean(previous.encrypted)
+    };
+  }
   writeDb(db);
   addSystemLog(`新建分类 ${clean}`, `在 ${typeName} 中新建分类 ${clean}`, ["分类"]);
 }
@@ -726,6 +778,7 @@ function deleteCategory(typeName, name) {
     if (db[typeName][filename]?.category === clean) db[typeName][filename].category = "默认";
   });
   if (typeName === "photos") delete db.categoryMeta.photos[clean];
+  if (typeName === "books") delete db.categoryMeta.books[clean];
   writeDb(db);
   addSystemLog(`删除分类 ${clean}`, `删除 ${typeName} 分类 ${clean}，相关媒体回到默认分类`, ["分类"]);
 }
@@ -786,6 +839,23 @@ function setPhotoFolderEncryption(category, folder, encrypted) {
   };
   writeDb(db);
   addSystemLog(`${encrypted ? "加密" : "取消加密"}月份文件夹 ${cleanFolder}`, `${cleanCategory} 下的月份文件夹 ${cleanFolder} 已${encrypted ? "设为加密" : "取消加密"}`, ["照片", "加密"]);
+}
+
+function setBookCategoryEncryption(category, encrypted) {
+  const db = readDb();
+  const cleanCategory = String(category || "").trim();
+  if (!cleanCategory || !db.categories.books.includes(cleanCategory)) {
+    throw createHttpError("INVALID_BOOK_CATEGORY", "图书馆展区无效", 400);
+  }
+  const previous = db.categoryMeta.books[cleanCategory] || { cover: "", note: "", encrypted: false };
+  db.categoryMeta.books[cleanCategory] = {
+    ...previous,
+    cover: previous.cover || "",
+    note: previous.note || "",
+    encrypted: Boolean(encrypted)
+  };
+  writeDb(db);
+  addSystemLog(`${encrypted ? "加密" : "取消加密"}图书馆展区 ${cleanCategory}`, `图书馆展区 ${cleanCategory} 已${encrypted ? "设为加密" : "取消加密"}`, ["图书馆", "加密"]);
 }
 
 function renamePhotoFolder(category, folder, nextName) {
@@ -1266,7 +1336,7 @@ function isAdminRoute(request) {
 
 function contentTypeFor(filePath) {
   const ext = path.extname(filePath).toLowerCase();
-  return ({ ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml", ".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg" })[ext] || "application/octet-stream";
+  return ({ ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif", ".svg": "image/svg+xml", ".mp4": "video/mp4", ".mov": "video/quicktime", ".webm": "video/webm", ".mp3": "audio/mpeg", ".wav": "audio/wav", ".ogg": "audio/ogg", ".pdf": "application/pdf", ".epub": "application/epub+zip", ".mobi": "application/x-mobipocket-ebook", ".azw3": "application/vnd.amazon.ebook" })[ext] || "application/octet-stream";
 }
 
 function wantsHtml(request) {
@@ -1392,8 +1462,10 @@ fastify.post("/api/view-unlock", async (request, reply) => {
   }
   const category = String(request.body?.category || "").trim();
   const folder = String(request.body?.folder || "").trim();
+  const bookCategory = String(request.body?.bookCategory || "").trim();
   const folders = unlockedViewFolders(request);
   if (category && folder) folders.add(viewFolderKey(category, folder));
+  if (bookCategory) folders.add(bookCategoryKey(bookCategory));
   setScopedViewSessionCookie(reply, folders);
   reply.send(ok({ unlocked: true, folders: Array.from(folders) }));
 });
@@ -1442,16 +1514,22 @@ fastify.register(staticPlugin, {
   decorateReply: false
 });
 
-fastify.register(staticPlugin, {
-  root: BOOK_DIR,
-  prefix: "/assets/books/",
-  decorateReply: false
+fastify.get("/assets/books/:filename", async (request, reply) => {
+  const book = findBookByFilename(request.params.filename);
+  if (!book || !canAccessBook(request, book)) return reply.code(404).send("Not found");
+  const filePath = path.join(BOOK_DIR, safeName(book.filename));
+  assertInside(BOOK_DIR, filePath);
+  if (!fs.existsSync(filePath)) return reply.code(404).send("Not found");
+  return sendProtectedFile(reply, filePath);
 });
 
-fastify.register(staticPlugin, {
-  root: path.join(THUMB_DIR, "books"),
-  prefix: "/thumbnails/books/",
-  decorateReply: false
+fastify.get("/thumbnails/books/:filename", async (request, reply) => {
+  const book = findBookByThumbnail(request.params.filename);
+  if (!book || !canAccessBook(request, book)) return reply.code(404).send("Not found");
+  const filePath = path.join(THUMB_DIR, "books", safeName(request.params.filename));
+  assertInside(path.join(THUMB_DIR, "books"), filePath);
+  if (!fs.existsSync(filePath)) return reply.code(404).send("Not found");
+  return sendProtectedFile(reply, filePath);
 });
 
 fastify.register(staticPlugin, {
@@ -1509,6 +1587,11 @@ fastify.post("/api/photo-folders/:category", async (request, reply) => {
 
 fastify.patch("/api/photo-folders/encryption", async (request, reply) => {
   setPhotoFolderEncryption(request.body?.category, request.body?.folder, Boolean(request.body?.encrypted));
+  reply.send(ok(responsePayloadForRequest(request)));
+});
+
+fastify.patch("/api/book-categories/encryption", async (request, reply) => {
+  setBookCategoryEncryption(request.body?.category, Boolean(request.body?.encrypted));
   reply.send(ok(responsePayloadForRequest(request)));
 });
 
