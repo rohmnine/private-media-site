@@ -38,6 +38,7 @@ const canUseApi = location.protocol === "http:" || location.protocol === "https:
 const isManageMode = new URLSearchParams(location.search).get("manage") === "1";
 const currentPage = location.pathname.split("/").pop() || "index.html";
 const unlockedPhotoFolders = new Set(canUseApi ? [] : JSON.parse(sessionStorage.getItem("mediaHubUnlockedPhotoFolders") || "[]"));
+const unlockedBookCategories = new Set(canUseApi ? [] : JSON.parse(sessionStorage.getItem("mediaHubUnlockedBookCategories") || "[]"));
 let adminUnlocked = !canUseApi;
 let activeDramaIndex = 0;
 let activeFilters = { videos: "全部", photos: "全部", audios: "全部", books: "全部" };
@@ -136,7 +137,7 @@ function collectionOptions(selected = "电子垃圾") {
 }
 
 function itemTypeLabel(type) {
-  return ({ videos: "影像碎片", photos: "视觉残片", audios: "声音碎片", books: "纸页藏书", logs: "生活日志" })[type] || "藏品";
+  return ({ videos: "影像碎片", photos: "视觉残片", audios: "声音碎片", books: "图书馆", logs: "生活日志" })[type] || "藏品";
 }
 
 function itemDetailUrl(type, item) {
@@ -151,7 +152,7 @@ function allMuseumItems() {
     ...siteData.videos.map((item) => ({ ...normalizeMuseumItem("videos", item), type: "videos" })),
     ...siteData.photos.filter(canViewPhotoItem).map((item) => ({ ...normalizeMuseumItem("photos", item), type: "photos" })),
     ...siteData.audios.map((item) => ({ ...normalizeMuseumItem("audios", item), type: "audios" })),
-    ...siteData.books.map((item) => ({ ...normalizeMuseumItem("books", item), type: "books" })),
+    ...siteData.books.filter(canViewBookItem).map((item) => ({ ...normalizeMuseumItem("books", item), type: "books" })),
     ...siteData.logs.map((item) => ({ ...normalizeMuseumItem("logs", item), type: "logs", collectionType: "生活日志", museumId: item.id || item.date }))
   ];
 }
@@ -296,6 +297,22 @@ function canViewPhotoItem(item = {}) {
   return isPhotoFolderUnlocked(item.category || "默认", item.folder || "未归档");
 }
 
+function saveUnlockedBookCategories() {
+  sessionStorage.setItem("mediaHubUnlockedBookCategories", JSON.stringify(Array.from(unlockedBookCategories)));
+}
+
+function isBookCategoryEncrypted(category = "默认") {
+  return Boolean(siteData.categoryMeta.books?.[category]?.encrypted);
+}
+
+function isBookCategoryUnlocked(category = "默认") {
+  return !isBookCategoryEncrypted(category) || unlockedBookCategories.has(category);
+}
+
+function canViewBookItem(item = {}) {
+  return isBookCategoryUnlocked(item.category || "默认");
+}
+
 function batchTypeLabel(type) {
   return ({ videos: "影像藏品", photos: "视觉藏品", audios: "声音藏品" })[type] || "藏品";
 }
@@ -324,13 +341,21 @@ function updateBatchCounts() {
 
 function encryptedViewLabel(type) {
   if (type === "photo-folder") return "加密文件夹";
+  if (type === "book-category") return "图书馆展区";
   return ({ photos: "相册", logs: "日志" })[type] || "内容";
 }
 
 function encryptedGateMarkup(type, context = {}) {
   const label = encryptedViewLabel(type);
-  const detail = context.folder ? `“${escapeHtml(context.category || "默认")} / ${escapeHtml(context.folder)}”已加密。` : "请输入查看密码后继续浏览内容。";
-  const attrs = context.category && context.folder ? ` data-unlock-category="${escapeHtml(context.category)}" data-unlock-folder="${escapeHtml(context.folder)}"` : "";
+  let detail = "请输入查看密码后继续浏览内容。";
+  let attrs = "";
+  if (context.folder) {
+    detail = `“${escapeHtml(context.category || "默认")} / ${escapeHtml(context.folder)}”已加密。`;
+    attrs = ` data-unlock-category="${escapeHtml(context.category)}" data-unlock-folder="${escapeHtml(context.folder)}"`;
+  } else if (context.bookCategory) {
+    detail = `图书馆展区“${escapeHtml(context.bookCategory)}”已加密。`;
+    attrs = ` data-unlock-book-category="${escapeHtml(context.bookCategory)}"`;
+  }
   return `<article class="encrypted-gate pixel-card"><p class="eyebrow">ENCRYPTED VIEW</p><h2>${label}已加密</h2><p class="hero-text">${detail} 查看密码默认复用站点登录密码，也可以在 .env 中用 MEDIA_HUB_VIEW_PASSWORD 单独配置。</p><form class="encrypted-form" data-encrypted-unlock="${type}"${attrs}><input class="pixel-input" name="password" type="password" autocomplete="current-password" placeholder="查看密码" /><button class="pixel-button secondary" type="submit">解锁${label}</button><span class="form-status" data-encrypted-status></span></form></article>`;
 }
 
@@ -361,14 +386,26 @@ function bindEncryptedForms(scope = document) {
           renderAll();
           return;
         }
+        if (type === "book-category") {
+          unlockedBookCategories.add(form.dataset.unlockBookCategory);
+          saveUnlockedBookCategories();
+          renderAll();
+          return;
+        }
         if (status) status.textContent = "该内容不支持此解锁方式";
         return;
       }
       try {
-        await requestApi("/api/view-unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password, category: form.dataset.unlockCategory, folder: form.dataset.unlockFolder }) });
+        await requestApi("/api/view-unlock", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ password, category: form.dataset.unlockCategory, folder: form.dataset.unlockFolder, bookCategory: form.dataset.unlockBookCategory }) });
         if (type === "photo-folder") {
           unlockedPhotoFolders.add(photoFolderKey(form.dataset.unlockCategory, form.dataset.unlockFolder));
           saveUnlockedPhotoFolders();
+          await loadServerMedia();
+          return;
+        }
+        if (type === "book-category") {
+          unlockedBookCategories.add(form.dataset.unlockBookCategory);
+          saveUnlockedBookCategories();
           await loadServerMedia();
           return;
         }
@@ -547,7 +584,13 @@ function renderCategoryManager(type) {
   const names = ["全部", ...(siteData.categories[type] || ["默认"] )];
   tabs.innerHTML = names.map((name) => {
     const safeName = escapeHtml(name);
-    const tab = `<button class="folder-tab ${activeFilters[type] === name ? "active" : ""}" data-category-filter="${type}:${safeName}" type="button">${safeName}</button>`;
+    const encrypted = type === "books" && isBookCategoryEncrypted(name);
+    const tab = `<button class="folder-tab ${activeFilters[type] === name ? "active" : ""}" data-category-filter="${type}:${safeName}" type="button">${safeName}${encrypted ? " 🔒" : ""}</button>`;
+    if (type === "books" && canManage() && name !== "全部") {
+      const lockToggle = `<button class="category-lock" data-book-encrypt-name="${safeName}" data-book-encrypt-next="${encrypted ? "0" : "1"}" type="button" aria-label="${encrypted ? "取消加密" : "加密"}展区 ${safeName}">${encrypted ? "🔓" : "🔒"}</button>`;
+      const deleteBtn = name === "默认" ? "" : `<button class="category-delete" data-category-delete="${type}:${safeName}" type="button" aria-label="删除展区 ${safeName}">×</button>`;
+      return `<span class="category-chip">${tab}${lockToggle}${deleteBtn}</span>`;
+    }
     if (!canManage() || name === "全部" || name === "默认") return tab;
     return `<span class="category-chip">${tab}<button class="category-delete" data-category-delete="${type}:${safeName}" type="button" aria-label="删除展区 ${safeName}">×</button></span>`;
   }).join("");
@@ -587,6 +630,31 @@ function renderCategoryManager(type) {
         applyServerPayload(data);
       } catch (error) {
         alert(`删除展区失败：${error.message}`);
+        button.disabled = false;
+      }
+    });
+  });
+  tabs.querySelectorAll("[data-book-encrypt-name]").forEach((button) => {
+    button.addEventListener("click", async (event) => {
+      event.stopPropagation();
+      const name = button.dataset.bookEncryptName;
+      const encrypted = button.dataset.bookEncryptNext === "1";
+      if (!canUseApi) {
+        siteData.categoryMeta.books = siteData.categoryMeta.books || {};
+        const prev = siteData.categoryMeta.books[name] || {};
+        siteData.categoryMeta.books[name] = { ...prev, encrypted };
+        if (!encrypted) unlockedBookCategories.delete(name);
+        renderAll();
+        return;
+      }
+      button.disabled = true;
+      try {
+        const data = await requestApi("/api/book-categories/encryption", { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ category: name, encrypted }) });
+        if (encrypted) unlockedBookCategories.delete(name);
+        else unlockedBookCategories.add(name);
+        applyServerPayload(data);
+      } catch (error) {
+        alert(`设置加密失败：${error.message}`);
         button.disabled = false;
       }
     });
@@ -1107,7 +1175,15 @@ function renderBooks(targetId = "book-list", items = filtered("books", siteData.
   const target = byId(targetId);
   if (!target) return;
   const usePagination = targetId === "book-list";
-  const page = usePagination ? pagedItems("books", items) : { items, page: 1, totalPages: 1, total: items.length };
+  if (usePagination) {
+    const activeCategory = activeFilters.books || "全部";
+    if (activeCategory !== "全部" && isBookCategoryEncrypted(activeCategory) && !isBookCategoryUnlocked(activeCategory)) {
+      showEncryptedGate(target, "book-category", { bookCategory: activeCategory });
+      return;
+    }
+  }
+  const visible = items.filter(canViewBookItem);
+  const page = usePagination ? pagedItems("books", visible) : { items: visible, page: 1, totalPages: 1, total: visible.length };
   target.innerHTML = page.items.map(bookCard).join("") || `<article class="log-item"><h3>当前展区暂无书籍</h3><p>可以切换展区或在上方登记电子书（PDF / EPUB / MOBI）。</p></article>`;
   if (usePagination) target.insertAdjacentHTML("beforeend", paginationMarkup("books", page.page, page.totalPages, page.total));
   bindMediaEditForms(target);
@@ -1368,7 +1444,7 @@ function renderStatsPanel() {
     <div class="stat-box pixel-card"><span>影像碎片</span><strong>${stats.videos.count}</strong><em>${formatBytes(stats.videos.size)}</em></div>
     <div class="stat-box pixel-card"><span>视觉残片</span><strong>${stats.photos.count}</strong><em>${formatBytes(stats.photos.size)}</em></div>
     <div class="stat-box pixel-card"><span>声音碎片</span><strong>${stats.audios.count}</strong><em>${formatBytes(stats.audios.size)}</em></div>
-    <div class="stat-box pixel-card"><span>纸页藏书</span><strong>${booksStat.count}</strong><em>${formatBytes(booksStat.size)}</em></div>
+    <div class="stat-box pixel-card"><span>图书馆</span><strong>${booksStat.count}</strong><em>${formatBytes(booksStat.size)}</em></div>
     <div class="stat-box pixel-card"><span>馆藏日志</span><strong>${stats.logs.count}</strong><em>最近：${escapeHtml(stats.latestUpload)}</em></div>`;
 }
 
@@ -1442,7 +1518,7 @@ async function clearTrashItems() {
 }
 
 function trashTypeLabel(type) {
-  return ({ videos: "影像碎片", photos: "视觉残片", audios: "声音碎片", books: "纸页藏书" })[type] || type || "藏品";
+  return ({ videos: "影像碎片", photos: "视觉残片", audios: "声音碎片", books: "图书馆" })[type] || type || "藏品";
 }
 
 function trashCard(item) {
