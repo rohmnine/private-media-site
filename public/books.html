@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>图书馆 - 我的垃圾博物馆</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="scanline" aria-hidden="true"></div>
+  <div class="page-shell">
+    <header class="sub-header pixel-card">
+      <a href="index.html" class="back-link pixel-button">← 返回首页</a>
+      <div class="sub-header-title">
+        <p class="eyebrow">LIBRARY</p>
+        <h1>图书馆</h1>
+        <span class="section-tag">电子书展区</span>
+      </div>
+      <p class="hero-text">把喜欢的电子书（PDF / EPUB / MOBI）登记成私人藏品，附上书名、作者、读后感和标签，随时打开或下载原文件。馆长模式下可把指定展区标记为加密，需查看密码才能解锁。</p>
+      <div class="page-actions">
+        <a href="books.html?manage=1" class="pixel-button secondary" data-manage-link>入馆登记</a>
+        <a href="timeline.html" class="pixel-button tertiary">时间线</a>
+      </div>
+    </header>
+
+    <main class="standalone-content">
+      <section class="media-section pixel-card">
+        <div class="upload-panel manage-only">
+          <div class="registration-fields">
+            <input class="pixel-input" name="title" placeholder="书名（留空使用文件名）" />
+            <input class="pixel-input" name="author" placeholder="作者" />
+            <input class="pixel-input" name="description" placeholder="简介 / 读后感" />
+            <select class="pixel-input" name="collectionType"><option>电子垃圾</option><option>生活日志</option><option>现实垃圾</option></select>
+            <input class="pixel-input" name="objectType" value="book" placeholder="objectType" />
+            <input class="pixel-input" name="recordDate" type="date" />
+            <input class="pixel-input" name="location" placeholder="出版社 / 来源" />
+            <input class="pixel-input" name="tags" placeholder="标签，用逗号分隔，如：科幻,小说" />
+            <select class="pixel-input" name="visibility"><option value="private">private</option><option value="public">public</option><option value="hidden">hidden</option></select>
+            <label class="folder-encrypt-toggle"><input name="isFavorite" type="checkbox" />重点藏品</label>
+          </div>
+          <label for="book-upload" class="pixel-button upload-btn secondary">入馆登记电子书</label>
+          <input id="book-upload" type="file" accept=".pdf,.epub,.mobi,.azw3,application/pdf,application/epub+zip" multiple />
+          <p class="upload-tip" id="book-upload-status">通过 npm start 打开网站后，电子书会保存到 assets/books，并在登记后进入藏品详情页。</p>
+        </div>
+
+        <div class="manager-panel manage-only">
+          <form class="category-form" data-category-form="books">
+            <input class="pixel-input" name="name" type="text" placeholder="新建展区，如：小说 / 技术 / 漫画" />
+            <button class="pixel-button secondary" type="submit">新建展区</button>
+          </form>
+          <div class="batch-manager" id="books-batch-manager"></div>
+        </div>
+
+        <div class="folder-tabs" id="books-category-tabs"></div>
+
+        <div class="book-list" id="book-list"></div>
+      </section>
+    </main>
+  </div>
+
+  <script src="scripts.js"></script>
+</body>
+</html>
