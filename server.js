@@ -1197,7 +1197,7 @@ const allowedMimes = {
   videos: [/^video\//, /^application\/octet-stream$/],
   photos: [/^image\//],
   audios: [/^audio\//, /^application\/ogg$/, /^application\/octet-stream$/],
-  books: [/^application\/pdf$/, /^application\/epub\+zip$/, /^application\/x-mobipocket-ebook$/, /^application\/vnd\.amazon\.ebook$/, /^application\/zip$/, /^application\/octet-stream$/]
+  books: [/^application\/pdf$/, /^application\/epub\+zip$/, /^application\/epub$/, /^application\/x-mobipocket-ebook$/, /^application\/vnd\.amazon\.ebook$/, /^application\/zip$/, /^application\/x-zip-compressed$/, /^application\/x-zip$/, /^application\/octet-stream$/]
 };
 
 function validateUpload(typeName, filename, mimetype = "") {
