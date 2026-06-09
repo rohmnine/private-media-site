@@ -80,6 +80,8 @@ private-media-site/
 
 随着视频、照片、音频数量增加，项目不建议长期只依赖电脑系统盘保存全部文件。推荐后续采用 **Docker 化部署 + NAS/数据盘存储 + 自动缩略图生成** 的方式，便于迁移、备份和长期维护。
 
+> 想在手机 / 异地访问（不暴露公网 IP、不开端口、自带 HTTPS）？见 [deploy/REMOTE-ACCESS.md](deploy/REMOTE-ACCESS.md)（Cloudflare Tunnel 方案，含 Windows 本机与 Docker 两种路径）。
+
 ### Docker 化部署
 
 Docker 化后，可以把运行环境、依赖和启动方式统一封装，避免不同电脑或服务器环境不一致导致启动失败。
@@ -224,6 +226,7 @@ MEDIA_HUB_VIEW_PASSWORD=view-123456
 MEDIA_HUB_ADMIN_PASSWORD=admin-123456
 MEDIA_HUB_DIARY_PASSWORD=diary-123456
 SESSION_SECRET=replace-with-a-long-random-secret
+COOKIE_SECURE=false
 MEDIA_HUB_MAX_UPLOAD_BYTES=8589934592
 MEDIA_HUB_TRASH_RETENTION_DAYS=30
 PORT=8080
@@ -232,6 +235,8 @@ DATA_ROOT=./data
 TRASH_ROOT=./trash
 THUMB_ROOT=./thumbnails
 ```
+
+> `COOKIE_SECURE`：经 HTTPS（公网 / 异地访问）时设为 `true`，让会话 Cookie 带上 `Secure` 标记，仅通过 HTTPS 传输；仅本机 `http://localhost` 调试时保持 `false`。
 
 > **重要**：`MEDIA_HUB_VIEW_PASSWORD`、`MEDIA_HUB_ADMIN_PASSWORD`、`MEDIA_HUB_DIARY_PASSWORD` 都必须与 `MEDIA_HUB_PASSWORD` 不同，否则服务启动会报错。正式使用时务必修改为高强度密码。
 

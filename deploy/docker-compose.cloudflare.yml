@@ -1,0 +1,18 @@
+# Cloudflare Tunnel 叠加层：与 docker-compose.prod.yml 一起使用，
+# 让站点通过 Cloudflare 边缘以 HTTPS 暴露，无需公网 IP、无需开放任何入站端口。
+#
+# 启动：
+#   docker compose -f docker-compose.prod.yml -f deploy/docker-compose.cloudflare.yml up -d --build
+#
+# 需要在 .env 里设置 CLOUDFLARE_TUNNEL_TOKEN（在 Cloudflare Zero Trust 控制台创建隧道后获得）。
+# 在控制台里把隧道的 Public Hostname 指向：http://private-media-hub:8080
+# （两个容器在同一 compose 网络，cloudflared 用服务名访问，无需依赖宿主端口映射。）
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: media-hub-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN:?set CLOUDFLARE_TUNNEL_TOKEN in .env}
+    depends_on:
+      - private-media-hub
