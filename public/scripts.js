@@ -1994,6 +1994,10 @@ function loadPhotoExif(item) {
     });
 }
 
+function timelineIcon(type) {
+  return ({ videos: "▶", photos: "▧", audios: "♫", books: "▤", logs: "✎" })[type] || "▤";
+}
+
 function renderTimeline() {
   const target = byId("timeline-list");
   if (!target) return;
@@ -2008,7 +2012,10 @@ function renderTimeline() {
     acc[date].push(item);
     return acc;
   }, {});
-  target.innerHTML = Object.entries(groups).map(([date, group]) => `<section class="timeline-group"><h2>${escapeHtml(date)}</h2>${group.map((item) => `<article class="timeline-item"><time>${escapeHtml(item.recordDate || date)}</time><div><p class="meta-line">${escapeHtml(itemTypeLabel(item.type))} · ${escapeHtml(item.collectionType || "生活日志")} · ${item.isFavorite ? "重点藏品" : escapeHtml(item.status || "active")}</p><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.description || item.summary || "暂无描述")}</p><a class="text-link" href="${itemDetailUrl(item.type, item)}">查看藏品档案 →</a></div></article>`).join("")}</section>`).join("") || `<article class="log-item"><h3>时间线上暂无藏品</h3><p>完成入馆登记后会出现在这里。</p></article>`;
+  target.innerHTML = Object.entries(groups).map(([date, group]) => `<section class="timeline-group"><h2>${escapeHtml(date)}<em class="timeline-count">${group.length} 件</em></h2>${group.map((item) => {
+    const isLog = item.type === "logs";
+    return `<article class="timeline-item tl-${escapeHtml(item.type)} ${isLog ? "is-log" : "is-collection"}"><time>${escapeHtml(item.recordDate || date)}</time><div><p class="meta-line"><span class="tl-icon" aria-hidden="true">${timelineIcon(item.type)}</span><span class="tl-kind ${isLog ? "kind-log" : "kind-item"}">${isLog ? "日志" : "藏品"}</span> · ${escapeHtml(itemTypeLabel(item.type))} · ${escapeHtml(item.collectionType || "生活日志")} · ${item.isFavorite ? "重点藏品" : escapeHtml(item.status || "active")}</p><h3>${escapeHtml(item.title)}</h3><p>${escapeHtml(item.description || item.summary || "暂无描述")}</p><a class="text-link" href="${itemDetailUrl(item.type, item)}">查看藏品档案 →</a></div></article>`;
+  }).join("")}</section>`).join("") || `<article class="log-item"><h3>时间线上暂无藏品</h3><p>完成入馆登记后会出现在这里。</p></article>`;
 }
 
 function countValues(items, getter) {
@@ -2019,9 +2026,17 @@ function countValues(items, getter) {
   }, {});
 }
 
-function cloudMarkup(counts, queryPrefix) {
+function cloudMarkup(counts, queryPrefix, activeValue) {
   const entries = Object.entries(counts).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "zh-Hans-CN"));
-  return entries.map(([name, count]) => `<a class="tag-pill" href="${queryPrefix}${encodeURIComponent(name)}"><span>${escapeHtml(name)}</span><em>${count}</em></a>`).join("") || `<p class="upload-tip">暂无可统计内容。</p>`;
+  if (!entries.length) return `<p class="upload-tip">暂无可统计内容。</p>`;
+  const max = entries[0][1];
+  return entries.map(([name, count], index) => {
+    const tier = max <= 1 ? 1 : Math.min(4, Math.max(1, Math.ceil((count / max) * 4)));
+    const hot = index < 3 && count > 1 ? " is-hot" : "";
+    const active = activeValue && name === activeValue ? " is-active" : "";
+    const rank = index < 3 && count > 1 ? `<span class="tag-rank">${index + 1}</span>` : "";
+    return `<a class="tag-pill tier-${tier}${hot}${active}" href="${queryPrefix}${encodeURIComponent(name)}" data-cloud-value="${escapeHtml(name)}">${rank}<span>${escapeHtml(name)}</span><em>${count}</em></a>`;
+  }).join("");
 }
 
 function itemMiniRow(item) {
@@ -2035,17 +2050,18 @@ function renderTagsPage() {
   const results = byId("advanced-filter-results");
   if (!tagCloud && !zoneCloud && !favorites && !results) return;
   const items = allMuseumItems();
-  if (tagCloud) tagCloud.innerHTML = cloudMarkup(countValues(items, (item) => normalizeTags(item.tags)), "tags.html?tag=");
-  if (zoneCloud) zoneCloud.innerHTML = cloudMarkup(countValues(items, (item) => [item.category || itemTypeLabel(item.type)]), "tags.html?zone=");
+  const params = new URLSearchParams(location.search);
+  const queryInput = byId("tag-filter-query");
+  if (queryInput && !queryInput.value) queryInput.value = params.get("tag") || params.get("zone") || "";
+  const activeValue = (queryInput?.value || "").trim();
+  if (tagCloud) tagCloud.innerHTML = cloudMarkup(countValues(items, (item) => normalizeTags(item.tags)), "tags.html?tag=", activeValue);
+  if (zoneCloud) zoneCloud.innerHTML = cloudMarkup(countValues(items, (item) => [item.category || itemTypeLabel(item.type)]), "tags.html?zone=", activeValue);
   if (favorites) favorites.innerHTML = items.filter((item) => item.isFavorite).map(itemMiniRow).join("") || `<article class="log-item"><h3>暂无重点藏品</h3><p>在藏品详情页勾选“重点藏品”后会出现在这里。</p></article>`;
   if (results) {
-    const params = new URLSearchParams(location.search);
-    const queryInput = byId("tag-filter-query");
     const collectionInput = byId("tag-filter-collection");
     const statusInput = byId("tag-filter-status");
     const favoriteInput = byId("tag-filter-favorite");
-    if (queryInput && !queryInput.value) queryInput.value = params.get("tag") || params.get("zone") || "";
-    const query = (queryInput?.value || "").trim().toLowerCase();
+    const query = activeValue.toLowerCase();
     const collection = collectionInput?.value || "全部";
     const status = statusInput?.value || "全部";
     const onlyFavorite = favoriteInput?.checked || false;
@@ -2063,6 +2079,20 @@ function bindTagsFilters() {
     if (!input) return;
     input.addEventListener("input", renderTagsPage);
     input.addEventListener("change", renderTagsPage);
+  });
+  ["tag-cloud", "zone-cloud"].forEach((id) => {
+    const cloud = byId(id);
+    if (!cloud) return;
+    cloud.addEventListener("click", (event) => {
+      const pill = event.target.closest("[data-cloud-value]");
+      if (!pill) return;
+      event.preventDefault();
+      const queryInput = byId("tag-filter-query");
+      const value = pill.dataset.cloudValue;
+      if (queryInput) queryInput.value = queryInput.value === value ? "" : value;
+      renderTagsPage();
+      byId("advanced-filter-results")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
   });
 }
 
