@@ -1833,7 +1833,7 @@ function mediaPreviewMarkup(type, item) {
     if (lower.endsWith(".pdf")) {
       viewer = `<iframe class="book-viewer" src="${escapeHtml(src)}" title="${escapeHtml(item.title)}"></iframe>`;
     } else if (lower.endsWith(".epub")) {
-      viewer = `<div class="epub-reader" data-epub-src="${escapeHtml(src)}"><div class="epub-toolbar"><button class="pixel-button tertiary" type="button" data-epub-prev>← 上一页</button><span class="epub-loc" data-epub-loc>正在加载阅读器…</span><button class="pixel-button tertiary" type="button" data-epub-next>下一页 →</button></div><div class="epub-viewport" data-epub-viewport></div><p class="epub-fallback hero-text" data-epub-fallback hidden>无法在线渲染该 EPUB，请点击下方按钮下载后阅读。</p></div>`;
+      viewer = `<div class="epub-reader" data-epub-src="${escapeHtml(src)}"><div class="epub-toolbar"><button class="pixel-button tertiary" type="button" data-epub-prev>← 上一页</button><span class="epub-loc" data-epub-loc>正在加载阅读器…</span><div class="epub-toolbar-right"><button class="pixel-button tertiary" type="button" data-epub-fullscreen>⛶ 全屏</button><button class="pixel-button tertiary" type="button" data-epub-next>下一页 →</button></div></div><div class="epub-viewport" data-epub-viewport></div><p class="epub-fallback hero-text" data-epub-fallback hidden>无法在线渲染该 EPUB，请点击下方按钮下载后阅读。</p></div>`;
     } else {
       viewer = `<a class="book-cover-link" href="${escapeHtml(src)}" target="_blank" rel="noopener">${bookCoverMarkup(item)}</a>`;
     }
@@ -1906,20 +1906,36 @@ function initEpubReaders(scope) {
     const fallback = reader.querySelector("[data-epub-fallback]");
     const prevBtn = reader.querySelector("[data-epub-prev]");
     const nextBtn = reader.querySelector("[data-epub-next]");
+    const fsBtn = reader.querySelector("[data-epub-fullscreen]");
     const showFallback = () => {
       if (fallback) fallback.hidden = false;
       if (viewport) viewport.hidden = true;
       if (locEl) locEl.textContent = "在线阅读不可用";
-      [prevBtn, nextBtn].forEach((btn) => btn && (btn.disabled = true));
+      [prevBtn, nextBtn, fsBtn].forEach((btn) => btn && (btn.disabled = true));
     };
     if (typeof window.ePub !== "function" || !src || !viewport) return showFallback();
     let rendition;
     try {
       const book = window.ePub(src);
-      rendition = book.renderTo(viewport, { width: "100%", height: 520, flow: "paginated", spread: "none" });
+      rendition = book.renderTo(viewport, { width: "100%", height: viewport.clientHeight || 520, flow: "paginated", spread: "none" });
       rendition.display().then(() => { if (locEl) locEl.textContent = "阅读中"; }).catch(showFallback);
       if (prevBtn) prevBtn.addEventListener("click", () => rendition.prev());
       if (nextBtn) nextBtn.addEventListener("click", () => rendition.next());
+      const resize = () => { try { rendition.resize(viewport.clientWidth, viewport.clientHeight); } catch (error) { /* ignore */ } };
+      let resizeTimer;
+      window.addEventListener("resize", () => { clearTimeout(resizeTimer); resizeTimer = setTimeout(resize, 150); });
+      const isFs = () => document.fullscreenElement === reader;
+      if (fsBtn && reader.requestFullscreen) {
+        fsBtn.addEventListener("click", () => { isFs() ? document.exitFullscreen() : reader.requestFullscreen().catch(() => {}); });
+        document.addEventListener("fullscreenchange", () => {
+          const on = isFs();
+          reader.classList.toggle("is-fullscreen", on);
+          fsBtn.textContent = on ? "⛶ 退出全屏" : "⛶ 全屏";
+          setTimeout(resize, 60);
+        });
+      } else if (fsBtn) {
+        fsBtn.hidden = true;
+      }
       book.ready
         .then(() => book.locations.generate(1200))
         .then(() => {
