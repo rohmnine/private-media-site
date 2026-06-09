@@ -1827,9 +1827,17 @@ function mediaPreviewMarkup(type, item) {
   if (type === "videos") return `<video class="pixel-video large-video" controls preload="metadata" playsinline src="${escapeHtml(item.src)}"></video>`;
   if (type === "audios") return `<audio controls preload="metadata" src="${escapeHtml(item.src)}"></audio>`;
   if (type === "books") {
-    const isPdf = String(item.src || "").toLowerCase().endsWith(".pdf");
-    const viewer = isPdf ? `<iframe class="book-viewer" src="${escapeHtml(item.src)}" title="${escapeHtml(item.title)}"></iframe>` : `<a class="book-cover-link" href="${escapeHtml(item.src)}" target="_blank" rel="noopener">${bookCoverMarkup(item)}</a>`;
-    return `<div class="book-preview">${viewer}<a class="pixel-button secondary" href="${escapeHtml(item.src)}" target="_blank" rel="noopener">打开 / 下载电子书</a></div>`;
+    const src = String(item.src || "");
+    const lower = src.toLowerCase();
+    let viewer;
+    if (lower.endsWith(".pdf")) {
+      viewer = `<iframe class="book-viewer" src="${escapeHtml(src)}" title="${escapeHtml(item.title)}"></iframe>`;
+    } else if (lower.endsWith(".epub")) {
+      viewer = `<div class="epub-reader" data-epub-src="${escapeHtml(src)}"><div class="epub-toolbar"><button class="pixel-button tertiary" type="button" data-epub-prev>← 上一页</button><span class="epub-loc" data-epub-loc>正在加载阅读器…</span><button class="pixel-button tertiary" type="button" data-epub-next>下一页 →</button></div><div class="epub-viewport" data-epub-viewport></div><p class="epub-fallback hero-text" data-epub-fallback hidden>无法在线渲染该 EPUB，请点击下方按钮下载后阅读。</p></div>`;
+    } else {
+      viewer = `<a class="book-cover-link" href="${escapeHtml(src)}" target="_blank" rel="noopener">${bookCoverMarkup(item)}</a>`;
+    }
+    return `<div class="book-preview">${viewer}<a class="pixel-button secondary" href="${escapeHtml(src)}" target="_blank" rel="noopener">打开 / 下载电子书</a></div>`;
   }
   return `<article class="log-item"><p>${escapeHtml(item.summary || "生活日志藏品")}</p></article>`;
 }
@@ -1884,7 +1892,54 @@ function renderItemDetail() {
   target.innerHTML = `<article class="item-detail-card pixel-card"><div class="section-heading"><div><p class="eyebrow">COLLECTION FILE</p><h2>${escapeHtml(item.title)}</h2><p class="meta-line">藏品编号：${escapeHtml(item.museumId || item.id || "未编号")} · ${escapeHtml(item.collectionType || "生活日志")} · ${item.isFavorite ? "重点藏品" : "普通藏品"}</p></div>${actions}</div><div class="item-detail-grid"><div>${mediaPreviewMarkup(type, item)}</div><div class="item-facts"><p><strong>objectType：</strong>${escapeHtml(item.objectType)}</p><p><strong>recordDate：</strong>${escapeHtml(item.recordDate)}</p><p><strong>展区：</strong>${escapeHtml(item.category || itemTypeLabel(type))}</p><p><strong>描述：</strong>${escapeHtml(item.description || item.summary || "暂无描述")}</p><p><strong>标签：</strong>${tags.length ? tags.map((tag) => `#${escapeHtml(tag)}`).join(" ") : "暂无标签"}</p><p><strong>地点：</strong>${escapeHtml(item.location || item.folder || "未记录")}</p><p><strong>心情：</strong>${escapeHtml(item.mood || "未记录")}</p><p><strong>天气：</strong>${escapeHtml(item.weather || "未记录")}</p><p><strong>visibility：</strong>${escapeHtml(item.visibility)}</p><p><strong>status：</strong>${escapeHtml(item.status)}</p><p><strong>操作记录：</strong>${escapeHtml(item.updatedAt ? new Date(item.updatedAt).toLocaleString() : item.date || "静态藏品")}</p></div></div>${exifSection}${editForm}</article>`;
   bindVideoControls(target);
   bindItemDetailActions(target, type, item);
+  initEpubReaders(target);
   if (type === "photos" && canUseApi) loadPhotoExif(item);
+}
+
+function initEpubReaders(scope) {
+  const readers = scope.querySelectorAll(".epub-reader");
+  if (!readers.length) return;
+  readers.forEach((reader) => {
+    const src = reader.dataset.epubSrc;
+    const viewport = reader.querySelector("[data-epub-viewport]");
+    const locEl = reader.querySelector("[data-epub-loc]");
+    const fallback = reader.querySelector("[data-epub-fallback]");
+    const prevBtn = reader.querySelector("[data-epub-prev]");
+    const nextBtn = reader.querySelector("[data-epub-next]");
+    const showFallback = () => {
+      if (fallback) fallback.hidden = false;
+      if (viewport) viewport.hidden = true;
+      if (locEl) locEl.textContent = "在线阅读不可用";
+      [prevBtn, nextBtn].forEach((btn) => btn && (btn.disabled = true));
+    };
+    if (typeof window.ePub !== "function" || !src || !viewport) return showFallback();
+    let rendition;
+    try {
+      const book = window.ePub(src);
+      rendition = book.renderTo(viewport, { width: "100%", height: 520, flow: "paginated", spread: "none" });
+      rendition.display().then(() => { if (locEl) locEl.textContent = "阅读中"; }).catch(showFallback);
+      if (prevBtn) prevBtn.addEventListener("click", () => rendition.prev());
+      if (nextBtn) nextBtn.addEventListener("click", () => rendition.next());
+      book.ready
+        .then(() => book.locations.generate(1200))
+        .then(() => {
+          rendition.on("relocated", (location) => {
+            if (!locEl || !location || !location.start) return;
+            const percent = book.locations.percentageFromCfi(location.start.cfi);
+            if (percent != null && !Number.isNaN(percent)) locEl.textContent = `${Math.round(percent * 100)}%`;
+          });
+        })
+        .catch(() => {});
+      const onKey = (event) => {
+        if (event.key === "ArrowLeft") rendition.prev();
+        else if (event.key === "ArrowRight") rendition.next();
+      };
+      document.addEventListener("keyup", onKey);
+      rendition.on("keyup", onKey);
+    } catch (error) {
+      showFallback();
+    }
+  });
 }
 
 function exifRows(exif) {
