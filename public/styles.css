@@ -1321,7 +1321,60 @@ video {
   padding: 16px;
   background: var(--panel-alt);
   border: 3px solid var(--border);
+  border-left-width: 10px;
   box-shadow: 6px 6px 0 var(--shadow);
+}
+
+.timeline-item.tl-videos { border-left-color: var(--accent); }
+.timeline-item.tl-photos { border-left-color: var(--accent-2); }
+.timeline-item.tl-audios { border-left-color: var(--accent-3); }
+.timeline-item.tl-books { border-left-color: var(--accent-4); }
+.timeline-item.is-log {
+  border-left-style: dashed;
+  border-left-color: var(--accent-4);
+  background: var(--panel);
+}
+
+.tl-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  color: var(--shadow);
+  background: var(--accent-2);
+  border: 2px solid var(--border);
+  font-size: 0.7rem;
+  vertical-align: middle;
+}
+
+.tl-videos .tl-icon { background: var(--accent); }
+.tl-photos .tl-icon { background: var(--accent-2); }
+.tl-audios .tl-icon { background: var(--accent-3); }
+.tl-books .tl-icon { background: var(--accent-4); }
+.is-log .tl-icon { background: var(--accent-4); }
+
+.tl-kind {
+  display: inline-block;
+  padding: 1px 6px;
+  margin-right: 4px;
+  color: var(--shadow);
+  border: 2px solid var(--border);
+  font-weight: 900;
+}
+
+.tl-kind.kind-log { background: var(--accent-4); }
+.tl-kind.kind-item { background: var(--accent-3); }
+
+.timeline-count {
+  margin-left: 10px;
+  padding: 2px 8px;
+  color: var(--text);
+  background: var(--panel-soft);
+  border: 2px solid var(--border);
+  font-style: normal;
+  font-size: 0.75rem;
 }
 
 .timeline-item time {
@@ -1383,6 +1436,36 @@ video {
   background: var(--accent-3);
   padding: 2px 6px;
   font-style: normal;
+}
+
+.tag-pill { cursor: pointer; transition: transform 0.05s ease; }
+.tag-pill:hover { transform: translate(-1px, -1px); }
+.tag-pill.tier-1 { font-size: 0.8rem; }
+.tag-pill.tier-2 { font-size: 0.95rem; }
+.tag-pill.tier-3 { font-size: 1.1rem; }
+.tag-pill.tier-4 { font-size: 1.3rem; }
+
+.tag-pill.is-hot {
+  background: var(--accent);
+  color: var(--shadow);
+}
+
+.tag-pill.is-active {
+  outline: 3px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+.tag-rank {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  color: var(--text);
+  background: var(--accent-4);
+  border: 2px solid var(--border);
+  font-size: 0.7rem;
+  font-weight: 900;
 }
 
 .login-shell {
