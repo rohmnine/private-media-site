@@ -7,6 +7,9 @@ services:
     environment:
       PORT: 8080
       MEDIA_HUB_PASSWORD: ${MEDIA_HUB_PASSWORD:-123456}
+      MEDIA_HUB_VIEW_PASSWORD: ${MEDIA_HUB_VIEW_PASSWORD:-view-123456}
+      MEDIA_HUB_ADMIN_PASSWORD: ${MEDIA_HUB_ADMIN_PASSWORD:-admin-123456}
+      MEDIA_HUB_DIARY_PASSWORD: ${MEDIA_HUB_DIARY_PASSWORD:-diary-123456}
       SESSION_SECRET: ${SESSION_SECRET:-replace-with-a-long-random-secret}
       MEDIA_ROOT: /app/assets
       DATA_ROOT: /app/data
