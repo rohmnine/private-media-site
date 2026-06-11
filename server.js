@@ -28,6 +28,10 @@ const VIEW_SESSION_COOKIE = "media_hub_view_session";
 const ADMIN_SESSION_COOKIE = "media_hub_admin_session";
 const DIARY_SESSION_COOKIE = "media_hub_diary_session";
 const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 7;
+// 受密码保护的媒体走 private 缓存：只缓存在访问者浏览器本地，不进公共边缘缓存。
+const ASSET_CACHE_SECONDS = Number(process.env.MEDIA_HUB_ASSET_CACHE_SECONDS || 60 * 60 * 24);
+// 缩略图文件名是内容哈希，可给更长缓存。
+const THUMB_CACHE_SECONDS = Number(process.env.MEDIA_HUB_THUMB_CACHE_SECONDS || 60 * 60 * 24 * 7);
 
 loadEnvFile();
 
@@ -723,9 +727,16 @@ function canAccessPhoto(request, photo) {
   return !isEncryptedPhotoFolder(db, category, folder) || unlockedViewFolders(request).has(viewFolderKey(category, folder));
 }
 
-function sendProtectedFile(reply, filePath) {
+function sendProtectedFile(reply, filePath, cacheSeconds = ASSET_CACHE_SECONDS) {
   reply.type(contentTypeFor(filePath));
+  if (cacheSeconds > 0) reply.header("Cache-Control", `private, max-age=${cacheSeconds}`);
   return reply.send(fs.createReadStream(filePath));
+}
+
+function staticCacheHeaders(cacheSeconds) {
+  return (res) => {
+    if (cacheSeconds > 0) res.setHeader("Cache-Control", `private, max-age=${cacheSeconds}`);
+  };
 }
 
 function ok(data = {}) {
@@ -1487,31 +1498,39 @@ fastify.get("/thumbnails/photos/:filename", async (request, reply) => {
   const filePath = path.join(THUMB_DIR, "photos", safeName(request.params.filename));
   assertInside(path.join(THUMB_DIR, "photos"), filePath);
   if (!fs.existsSync(filePath)) return reply.code(404).send("Not found");
-  return sendProtectedFile(reply, filePath);
+  return sendProtectedFile(reply, filePath, THUMB_CACHE_SECONDS);
 });
 
 fastify.register(staticPlugin, {
   root: VIDEO_DIR,
   prefix: "/assets/video/",
-  decorateReply: false
+  decorateReply: false,
+  cacheControl: false,
+  setHeaders: staticCacheHeaders(ASSET_CACHE_SECONDS)
 });
 
 fastify.register(staticPlugin, {
   root: AUDIO_DIR,
   prefix: "/assets/audio/",
-  decorateReply: false
+  decorateReply: false,
+  cacheControl: false,
+  setHeaders: staticCacheHeaders(ASSET_CACHE_SECONDS)
 });
 
 fastify.register(staticPlugin, {
   root: path.join(THUMB_DIR, "video"),
   prefix: "/thumbnails/video/",
-  decorateReply: false
+  decorateReply: false,
+  cacheControl: false,
+  setHeaders: staticCacheHeaders(THUMB_CACHE_SECONDS)
 });
 
 fastify.register(staticPlugin, {
   root: path.join(THUMB_DIR, "audio"),
   prefix: "/thumbnails/audio/",
-  decorateReply: false
+  decorateReply: false,
+  cacheControl: false,
+  setHeaders: staticCacheHeaders(THUMB_CACHE_SECONDS)
 });
 
 fastify.get("/assets/books/:filename", async (request, reply) => {
@@ -1529,7 +1548,7 @@ fastify.get("/thumbnails/books/:filename", async (request, reply) => {
   const filePath = path.join(THUMB_DIR, "books", safeName(request.params.filename));
   assertInside(path.join(THUMB_DIR, "books"), filePath);
   if (!fs.existsSync(filePath)) return reply.code(404).send("Not found");
-  return sendProtectedFile(reply, filePath);
+  return sendProtectedFile(reply, filePath, THUMB_CACHE_SECONDS);
 });
 
 fastify.register(staticPlugin, {
