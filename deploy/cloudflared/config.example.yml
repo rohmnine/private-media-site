@@ -1,0 +1,16 @@
+# 复制为 deploy/cloudflared/config.yml，按下面注释填好后再启动隧道容器。
+#
+# tunnel: 填你的隧道 ID（cloudflared tunnel create 时输出的那串 UUID）。
+#         用 ID 而不是隧道名，这样容器里无需 cert.pem 也能 run。
+tunnel: 00000000-0000-0000-0000-000000000000
+
+# credentials-file: 指向容器内挂载后的凭据文件路径。
+#   把你本机 ~/.cloudflared/<隧道ID>.json 拷到 deploy/cloudflared/ 下，
+#   文件名保持 <隧道ID>.json，这里就写 /etc/cloudflared/<隧道ID>.json。
+credentials-file: /etc/cloudflared/00000000-0000-0000-0000-000000000000.json
+
+ingress:
+  # hostname 填你的域名；service 指向 compose 里的站点服务名（容器间互通），不是 localhost。
+  - hostname: museum.your-domain.com
+    service: http://private-media-hub:8080
+  - service: http_status:404

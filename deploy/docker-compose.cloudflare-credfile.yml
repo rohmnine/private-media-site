@@ -1,0 +1,27 @@
+# Cloudflare Tunnel 叠加层（凭据文件版）：与 docker-compose.prod.yml 一起用。
+#
+# 适合「用命令行 cloudflared tunnel create 建好隧道、不想碰 Zero Trust 控制台 Token」的情况
+# （例如不想为 Token 验证支付方式）。它直接挂载你已有的隧道凭据文件运行，复用你现在的域名。
+#
+# 启动：
+#   docker compose -f docker-compose.prod.yml -f deploy/docker-compose.cloudflare-credfile.yml up -d --build
+#
+# 准备工作（在服务器项目目录里）：
+#   1. 新建 deploy/cloudflared/ 目录。
+#   2. 把你本机 ~/.cloudflared/<隧道ID>.json 凭据文件拷进 deploy/cloudflared/。
+#      （Windows 路径形如 C:\Users\你\.cloudflared\<隧道ID>.json）
+#   3. 复制 deploy/cloudflared/config.example.yml 为 deploy/cloudflared/config.yml，
+#      按里面的注释把隧道ID、域名填好（service 指向 http://private-media-hub:8080）。
+#
+# 注意：cloudflared「run」只需要 <隧道ID>.json，不需要 cert.pem（cert.pem 只用于 create/route 等管理命令）。
+
+services:
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: media-hub-tunnel
+    restart: unless-stopped
+    command: tunnel --no-autoupdate --config /etc/cloudflared/config.yml run
+    volumes:
+      - ./deploy/cloudflared:/etc/cloudflared:ro
+    depends_on:
+      - private-media-hub
