@@ -1,4 +1,7 @@
 /.env
+deploy/.env
+deploy/cloudflared/*.json
+deploy/cloudflared/config.yml
 node_modules/
 .idea/
 .kilo/
