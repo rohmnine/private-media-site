@@ -733,9 +733,10 @@ function sendProtectedFile(reply, filePath, cacheSeconds = ASSET_CACHE_SECONDS) 
   return reply.send(fs.createReadStream(filePath));
 }
 
+// @fastify/static v10 passes the Fastify reply (v9 passed the raw ServerResponse).
 function staticCacheHeaders(cacheSeconds) {
-  return (res) => {
-    if (cacheSeconds > 0) res.setHeader("Cache-Control", `private, max-age=${cacheSeconds}`);
+  return (reply) => {
+    if (cacheSeconds > 0) reply.header("Cache-Control", `private, max-age=${cacheSeconds}`);
   };
 }
 
