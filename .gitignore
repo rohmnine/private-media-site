@@ -1,15 +1,27 @@
+# 环境与凭据（绝不提交）
 /.env
+.env
 .env.bak.*
+.env.*.bak
+*.bak
 deploy/.env
 deploy/cloudflared/*.json
 deploy/cloudflared/config.yml
-node_modules/
-.idea/
-.kilo/
-.omc/
+
+# 运行时数据（绝不可提交）
 data/
-.media-db.json
 assets/
 thumbnails/
 trash/
+.media-db.json
+
+# 依赖与编辑器
+node_modules/
 .kilo/node_modules/
+.idea/
+.kilo/
+.omc/
+
+# 个人杂项
+links_to_check.txt
+links_to_check*.txt

@@ -1,12 +1,13 @@
-node_modules/
-npm-debug.log*
 .env
+.env.*
+*.bak
+.media-db.json
+links_to_check.txt
 .git/
-.idea/
-.omc/
 assets/
 data/
 trash/
 thumbnails/
+node_modules/
 *.log
 .DS_Store

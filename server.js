@@ -47,11 +47,33 @@ const VIDEO_DIR = path.join(ASSETS_DIR, "video");
 const PHOTO_DIR = path.join(ASSETS_DIR, "photos");
 const AUDIO_DIR = path.join(ASSETS_DIR, "audio");
 const BOOK_DIR = path.join(ASSETS_DIR, "books");
-const MEDIA_HUB_PASSWORD = process.env.MEDIA_HUB_PASSWORD || "CHANGE_ME_ACCESS_PASSWORD";
-const MEDIA_HUB_VIEW_PASSWORD = process.env.MEDIA_HUB_VIEW_PASSWORD || "view-CHANGE_ME_ACCESS_PASSWORD";
-const MEDIA_HUB_ADMIN_PASSWORD = process.env.MEDIA_HUB_ADMIN_PASSWORD || "admin-CHANGE_ME_ACCESS_PASSWORD";
-const MEDIA_HUB_DIARY_PASSWORD = process.env.MEDIA_HUB_DIARY_PASSWORD || "diary-CHANGE_ME_ACCESS_PASSWORD";
-const SESSION_SECRET = process.env.SESSION_SECRET || crypto.createHash("sha256").update(`${ROOT_DIR}:private-media-hub`).digest("hex");
+// —— 必填环境变量读取：缺失/过短/仍是占位符一律拒绝启动，绝不回退默认值 ——
+function requireEnv(name, { minLength = 1 } = {}) {
+  const value = String(process.env[name] || "").trim();
+  if (!value) {
+    throw new Error(
+      `缺少必需的环境变量 ${name}。请复制 .env.example 为 .env 并填写后重启（参见 README「模板交付说明」）。`
+    );
+  }
+  if (value.length < minLength) {
+    throw new Error(`环境变量 ${name} 过短：至少需要 ${minLength} 个字符。`);
+  }
+  if (/^(change[-_]?me|replace[-_]?with|CHANGE_ME_ACCESS_PASSWORD|password)/i.test(value)) {
+    throw new Error(`环境变量 ${name} 仍是占位符/弱口令，请修改为真实随机值。`);
+  }
+  return value;
+}
+
+const MEDIA_HUB_PASSWORD = requireEnv("MEDIA_HUB_PASSWORD", { minLength: 8 });
+const MEDIA_HUB_VIEW_PASSWORD = requireEnv("MEDIA_HUB_VIEW_PASSWORD", { minLength: 8 });
+const MEDIA_HUB_ADMIN_PASSWORD = requireEnv("MEDIA_HUB_ADMIN_PASSWORD", { minLength: 8 });
+const MEDIA_HUB_DIARY_PASSWORD = requireEnv("MEDIA_HUB_DIARY_PASSWORD", { minLength: 8 });
+const SESSION_SECRET = requireEnv("SESSION_SECRET", { minLength: 32 });
+
+// 额外护栏：会话密钥不得是单字符重复 / 常见弱值
+if (new Set(SESSION_SECRET).size < 8) {
+  throw new Error("SESSION_SECRET 熵过低：请使用 `openssl rand -hex 32` 生成。");
+}
 const MAX_UPLOAD_BYTES = Number(process.env.MEDIA_HUB_MAX_UPLOAD_BYTES || 1024 * 1024 * 1024 * 8);
 const COOKIE_SECURE = String(process.env.COOKIE_SECURE || "false").toLowerCase() === "true";
 const COOKIE_ATTRIBUTES = `HttpOnly; SameSite=Lax; Path=/;${COOKIE_SECURE ? " Secure;" : ""} Max-Age=${SESSION_MAX_AGE_SECONDS}`;
@@ -137,8 +159,31 @@ function loadEnvFile() {
   });
 }
 
+function isInside(parentDir, targetPath) {
+  const parent = path.resolve(parentDir);
+  const target = path.resolve(targetPath);
+  const relative = path.relative(parent, target);
+  return relative === "" || (!relative.startsWith("..") && !path.isAbsolute(relative));
+}
+
+// 显式白名单：允许把媒体库放到项目目录之外（数据盘 / NAS）。
+// 通过 MEDIA_HUB_EXTRA_ROOTS 配置，多个根目录用 ; 或 : 分隔。
+function extraRoots() {
+  return String(process.env.MEDIA_HUB_EXTRA_ROOTS || "")
+    .split(/[;:]/)
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry) => path.resolve(entry));
+}
+
 function resolveConfiguredDir(value) {
-  return path.resolve(ROOT_DIR, String(value || "").trim());
+  const resolved = path.resolve(ROOT_DIR, String(value || "").trim());
+  if (isInside(ROOT_DIR, resolved)) return resolved;
+  if (extraRoots().some((root) => isInside(root, resolved))) return resolved;
+  throw new Error(
+    `配置的目录不在项目根目录内：${resolved}。为避免误把系统目录当作媒体库暴露，` +
+      `请将它放在项目目录下，或通过 MEDIA_HUB_EXTRA_ROOTS 显式声明允许的外部根目录（多个用 ; 分隔）。`
+  );
 }
 
 function ensureDirectories() {
@@ -610,12 +655,12 @@ function unlockedViewFolders(request) {
 
 function hasAdminSession(request) {
   const cookies = parseCookies(request.headers.cookie || "");
-  return isValidSession(cookies[ADMIN_SESSION_COOKIE]);
+  return isValidSession(cookies[ADMIN_SESSION_COOKIE], SESSION_ROLE.ADMIN);
 }
 
 function hasDiarySession(request) {
   const cookies = parseCookies(request.headers.cookie || "");
-  return isValidSession(cookies[DIARY_SESSION_COOKIE]);
+  return isValidSession(cookies[DIARY_SESSION_COOKIE], SESSION_ROLE.DIARY);
 }
 
 function responsePayloadForRequest(request) {
@@ -1223,7 +1268,15 @@ function validateUpload(typeName, filename, mimetype = "") {
 }
 
 function hasValidSignature(typeName, filePath, ext) {
-  const buffer = fs.readFileSync(filePath).subarray(0, 68);
+  const fd = fs.openSync(filePath, "r");
+  const head = Buffer.alloc(68);
+  let bytes = 0;
+  try {
+    bytes = fs.readSync(fd, head, 0, 68, 0); // ← 只读前 68 字节，避免把整个大文件载入内存
+  } finally {
+    fs.closeSync(fd);
+  }
+  const buffer = head.subarray(0, bytes);
   const ascii = buffer.toString("ascii");
   const hex = buffer.toString("hex");
   if (typeName === "photos") {
@@ -1274,7 +1327,14 @@ function parseCookies(cookieHeader = "") {
     const index = part.indexOf("=");
     if (index === -1) return cookies;
     const key = part.slice(0, index).trim();
-    const value = decodeURIComponent(part.slice(index + 1).trim());
+    const rawValue = part.slice(index + 1).trim();
+    let value = rawValue;
+    try {
+      value = decodeURIComponent(rawValue);
+    } catch (error) {
+      // 畸形百分号转义（如 "%zz"）不应触发 500，退化为原始值处理。
+      value = rawValue;
+    }
     if (key) cookies[key] = value;
     return cookies;
   }, {});
@@ -1284,26 +1344,37 @@ function sign(value) {
   return crypto.createHmac("sha256", SESSION_SECRET).update(value).digest("hex");
 }
 
-function createSessionToken() {
+// 恒定时间比较密码，避免时序侧信道（长度不同直接判否，长度本身不敏感）。
+function passwordMatches(input, expected) {
+  const a = Buffer.from(String(input));
+  const b = Buffer.from(String(expected));
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+const SESSION_ROLE = { VIEW: "view", ADMIN: "admin", DIARY: "diary" };
+
+function createSessionToken(role = SESSION_ROLE.VIEW) {
   const expires = Date.now() + SESSION_MAX_AGE_SECONDS * 1000;
   const nonce = crypto.randomBytes(16).toString("hex");
-  const payload = `${expires}.${nonce}`;
+  const payload = `${role}.${expires}.${nonce}`; // ← 角色参与签名，防止跨角色提权
   return `${payload}.${sign(payload)}`;
 }
 
-function isValidSession(token = "") {
-  const parts = token.split(".");
-  if (parts.length !== 3) return false;
-  const payload = `${parts[0]}.${parts[1]}`;
+function isValidSession(token = "", expectedRole = SESSION_ROLE.VIEW) {
+  const parts = String(token).split(".");
+  if (parts.length !== 4) return false;
+  const [role, expires, nonce, signature] = parts;
+  if (role !== expectedRole) return false; // ← 角色必须匹配，访客令牌不能冒充管理员/日记
+  const payload = `${role}.${expires}.${nonce}`;
   const expected = Buffer.from(sign(payload));
-  const actual = Buffer.from(parts[2] || "");
+  const actual = Buffer.from(signature || "");
   if (expected.length !== actual.length) return false;
   const validSignature = crypto.timingSafeEqual(expected, actual);
-  return validSignature && Number(parts[0]) > Date.now();
+  return validSignature && Number(expires) > Date.now();
 }
 
 function setSessionCookie(reply) {
-  const token = createSessionToken();
+  const token = createSessionToken(SESSION_ROLE.VIEW);
   reply.header("Set-Cookie", `${SESSION_COOKIE}=${encodeURIComponent(token)}; ${COOKIE_ATTRIBUTES}`);
 }
 
@@ -1313,12 +1384,12 @@ function setScopedViewSessionCookie(reply, folders) {
 }
 
 function setAdminSessionCookie(reply) {
-  const token = createSessionToken();
+  const token = createSessionToken(SESSION_ROLE.ADMIN);
   reply.header("Set-Cookie", `${ADMIN_SESSION_COOKIE}=${encodeURIComponent(token)}; ${COOKIE_ATTRIBUTES}`);
 }
 
 function setDiarySessionCookie(reply) {
-  const token = createSessionToken();
+  const token = createSessionToken(SESSION_ROLE.DIARY);
   reply.header("Set-Cookie", `${DIARY_SESSION_COOKIE}=${encodeURIComponent(token)}; ${COOKIE_ATTRIBUTES}`);
 }
 
@@ -1365,7 +1436,7 @@ function isPublicPath(url) {
 }
 
 function loginHtml(error = "") {
-  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>登录 - 我的垃圾博物馆</title><link rel="stylesheet" href="styles.css" /></head><body><div class="scanline" aria-hidden="true"></div><main class="login-shell"><section class="login-card pixel-card"><p class="eyebrow">MY TRASH MUSEUM</p><h1>闭馆保护</h1><p class="hero-text">请输入 .env 中配置的 MEDIA_HUB_PASSWORD 后继续访问我的垃圾博物馆。</p>${error ? `<p class="login-error">${error}</p>` : ""}<form method="post" action="/api/login" class="login-form"><input class="pixel-input" name="password" type="password" autocomplete="current-password" placeholder="访问密码" autofocus /><button class="pixel-button" type="submit">进入博物馆</button></form></section></main></body></html>`;
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>登录 - 私人媒体站</title><link rel="stylesheet" href="styles.css" /></head><body><div class="scanline" aria-hidden="true"></div><main class="login-shell"><section class="login-card pixel-card"><p class="eyebrow">PRIVATE MEDIA HUB</p><h1>访问保护</h1><p class="hero-text">请输入 .env 中配置的 MEDIA_HUB_PASSWORD 后继续访问私人媒体站。</p>${error ? `<p class="login-error">${error}</p>` : ""}<form method="post" action="/api/login" class="login-form"><input class="pixel-input" name="password" type="password" autocomplete="current-password" placeholder="访问密码" autofocus /><button class="pixel-button" type="submit">进入</button></form></section></main></body></html>`;
 }
 
 ensureDirectories();
@@ -1407,7 +1478,7 @@ fastify.addContentTypeParser("application/x-www-form-urlencoded", { parseAs: "st
 fastify.addHook("onRequest", async (request, reply) => {
   if (isPublicPath(request.url)) return;
   const cookies = parseCookies(request.headers.cookie || "");
-  if (isValidSession(cookies[SESSION_COOKIE])) {
+  if (isValidSession(cookies[SESSION_COOKIE], SESSION_ROLE.VIEW)) {
     if (isDiaryRoute(request) && !hasDiarySession(request)) {
       reply.code(403).send({ success: false, message: "请先解锁日记", code: "DIARY_REQUIRED" });
       return;
@@ -1442,7 +1513,7 @@ fastify.get("/login", async (request, reply) => {
 
 fastify.post("/api/login", async (request, reply) => {
   const password = String(request.body?.password || "");
-  if (password !== MEDIA_HUB_PASSWORD) {
+  if (!passwordMatches(password, MEDIA_HUB_PASSWORD)) {
     if (wantsHtml(request) || isFormPost(request)) return reply.code(401).type("text/html").send(loginHtml("密码错误，请重试。"));
     return reply.code(401).send({ success: false, message: "密码错误", code: "INVALID_PASSWORD" });
   }
@@ -1458,7 +1529,7 @@ fastify.post("/api/logout", async (request, reply) => {
 
 fastify.post("/api/admin-unlock", async (request, reply) => {
   const password = String(request.body?.password || "");
-  if (password !== MEDIA_HUB_ADMIN_PASSWORD) {
+  if (!passwordMatches(password, MEDIA_HUB_ADMIN_PASSWORD)) {
     return reply.code(403).send({ success: false, message: "管理密码错误", code: "INVALID_ADMIN_PASSWORD" });
   }
   setAdminSessionCookie(reply);
@@ -1469,7 +1540,7 @@ fastify.get("/api/admin-status", async (request) => ok({ unlocked: hasAdminSessi
 
 fastify.post("/api/view-unlock", async (request, reply) => {
   const password = String(request.body?.password || "");
-  if (password !== MEDIA_HUB_VIEW_PASSWORD) {
+  if (!passwordMatches(password, MEDIA_HUB_VIEW_PASSWORD)) {
     return reply.code(403).send({ success: false, message: "查看密码错误", code: "INVALID_VIEW_PASSWORD" });
   }
   const category = String(request.body?.category || "").trim();
@@ -1580,7 +1651,7 @@ fastify.post("/api/backups/:name/restore", async (request, reply) => {
 
 fastify.get("/api/export", async (request, reply) => {
   if (!hasAdminSession(request)) return reply.code(403).send({ success: false, message: "请先解锁馆长功能", code: "ADMIN_REQUIRED" });
-  const filename = `my-trash-museum-export-${new Date().toISOString().slice(0, 10)}.json`;
+  const filename = `private-media-hub-export-${new Date().toISOString().slice(0, 10)}.json`;
   reply.header("Content-Disposition", `attachment; filename="${filename}"`);
   reply.send(ok(exportDataPayload(request)));
 });
