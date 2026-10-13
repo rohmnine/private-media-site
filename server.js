@@ -59,7 +59,14 @@ function requireEnv(name, { minLength = 1 } = {}) {
   if (value.length < minLength) {
     throw new Error(`环境变量 ${name} 过短：至少需要 ${minLength} 个字符。`);
   }
-  if (/^(change[-_]?me|replace[-_]?with|CHANGE_ME_ACCESS_PASSWORD|password)/i.test(value)) {
+  // 占位符 / 弱口令检测（不写死任何具体口令字面量）：
+  //  - 占位符前缀（change*me / replace*with / password）
+  //  - 纯数字（旧默认口令即 6 位纯数字；如 123456、12345612 等一律拒绝）
+  //  - 单字符重复（如 aaaaaaaa）
+  const isPlaceholder = /^(change[-_]?me|replace[-_]?with|password)/i.test(value);
+  const isAllDigits = /^\d+$/.test(value);
+  const isSingleRepeatedChar = /^(.)\1+$/.test(value);
+  if (isPlaceholder || isAllDigits || isSingleRepeatedChar) {
     throw new Error(`环境变量 ${name} 仍是占位符/弱口令，请修改为真实随机值。`);
   }
   return value;
@@ -1724,7 +1731,7 @@ fastify.delete("/api/logs/:id", async (request, reply) => {
 
 fastify.post("/api/diary-unlock", async (request, reply) => {
   const password = String(request.body?.password || "");
-  if (password !== MEDIA_HUB_DIARY_PASSWORD) {
+  if (!passwordMatches(password, MEDIA_HUB_DIARY_PASSWORD)) {
     return reply.code(403).send({ success: false, message: "日记密码错误", code: "INVALID_DIARY_PASSWORD" });
   }
   setDiarySessionCookie(reply);
