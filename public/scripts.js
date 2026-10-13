@@ -14,7 +14,7 @@ const fallbackData = {
     { filename: "morning-note.mp3", museumId: "MGM-AUD-DEMO0002", collectionType: "生活日志", title: "清晨随笔", description: "示例音频，可替换成 assets/audio 下文件。", src: "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3", duration: "06:12", category: "默认", tags: [] }
   ],
   logs: [
-    { date: "2026-05-20", title: "开馆：我的垃圾博物馆", summary: "把视频、照片、音频和日志统一登记成私人藏品，后续可以按编号、展区、时间线回看。", mood: "兴奋", weather: "夜晚", tags: ["系统"] },
+    { date: "2026-05-20", title: "开馆：私人媒体站", summary: "把视频、照片、音频和日志统一登记成私人藏品，后续可以按编号、展区、时间线回看。", mood: "兴奋", weather: "夜晚", tags: ["系统"] },
     { date: "2026-05-18", title: "整理现实垃圾", summary: "将相册中的精选图片放进视觉残片展区，作为最近入馆内容展示。", mood: "专注", weather: "晴", tags: ["照片"] },
     { date: "2026-05-16", title: "影像碎片归档计划", summary: "先用本地 MOV 文件测试藏品播放体验，之后再按日期、地点或主题扩展展区。", mood: "期待", weather: "多云", tags: ["视频"] }
   ]
@@ -53,6 +53,39 @@ let backupsLoaded = false;
 
 function escapeHtml(value = "") {
   return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+}
+
+// 站点名称可配置：默认「私人媒体站」。若 /api/site-config 返回自定义名，
+// 则把页面中出现的默认名替换为自定义名（含 document.title）。失败静默处理。
+const DEFAULT_SITE_NAME = "私人媒体站";
+
+function applySiteNameToTextNodes(root, from, to) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT, null);
+  let node = walker.nextNode();
+  while (node) {
+    const parentName = node.parentNode && node.parentNode.nodeName;
+    const skipParent = parentName === "SCRIPT" || parentName === "STYLE" || parentName === "NOSCRIPT" || parentName === "TEXTAREA";
+    if (!skipParent && node.nodeValue && node.nodeValue.includes(from)) {
+      node.nodeValue = node.nodeValue.split(from).join(to);
+    }
+    node = walker.nextNode();
+  }
+}
+
+async function applySiteName() {
+  if (!canUseApi) return;
+  let siteName = "";
+  try {
+    const data = await requestApi("/api/site-config");
+    siteName = String((data && data.siteName) || "").trim();
+  } catch (error) {
+    return; // 静默：站点名不是关键功能，接口异常不应影响页面
+  }
+  if (!siteName || siteName === DEFAULT_SITE_NAME) return;
+  if (document.title && document.title.includes(DEFAULT_SITE_NAME)) {
+    document.title = document.title.split(DEFAULT_SITE_NAME).join(siteName);
+  }
+  if (document.body) applySiteNameToTextNodes(document.body, DEFAULT_SITE_NAME, siteName);
 }
 
 function fileNameWithoutExt(name) {
@@ -2250,6 +2283,7 @@ async function initDiaryPage() {
 }
 
 initManageMode();
+applySiteName();
 renderAll();
 bindUploadEvents();
 bindDramaEvents();

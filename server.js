@@ -40,6 +40,8 @@ const TRASH_DIR = resolveConfiguredDir(process.env.TRASH_ROOT || "./trash");
 const THUMB_DIR = resolveConfiguredDir(process.env.THUMB_ROOT || "./thumbnails");
 // PORT 必须在 loadEnvFile() 之后读取，否则 .env 中配置的 PORT 不会生效。
 const PORT = Number(process.env.PORT || 8080);
+// 站点名称（可选）：缺失/为空时静默回退到默认名「私人媒体站」；不使用 requireEnv 强制必填。
+const SITE_NAME = String(process.env.SITE_NAME || "私人媒体站").trim() || "私人媒体站";
 const DB_PATH = path.join(DATA_DIR, "media-db.json");
 const LOGS_PATH = path.join(DATA_DIR, "logs.json");
 const BACKUP_DIR = path.join(DATA_DIR, "backups");
@@ -1443,8 +1445,13 @@ function isPublicPath(url) {
   return pathname === "/login" || pathname === "/api/login" || pathname === "/styles.css" || pathname === "/scripts.js" || pathname === "/favicon.ico";
 }
 
+function escapeHtml(value = "") {
+  return String(value).replace(/[&<>'"]/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" }[char]));
+}
+
 function loginHtml(error = "") {
-  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>登录 - 私人媒体站</title><link rel="stylesheet" href="styles.css" /></head><body><div class="scanline" aria-hidden="true"></div><main class="login-shell"><section class="login-card pixel-card"><p class="eyebrow">PRIVATE MEDIA HUB</p><h1>访问保护</h1><p class="hero-text">请输入 .env 中配置的 MEDIA_HUB_PASSWORD 后继续访问私人媒体站。</p>${error ? `<p class="login-error">${error}</p>` : ""}<form method="post" action="/api/login" class="login-form"><input class="pixel-input" name="password" type="password" autocomplete="current-password" placeholder="访问密码" autofocus /><button class="pixel-button" type="submit">进入</button></form></section></main></body></html>`;
+  const siteName = escapeHtml(SITE_NAME);
+  return `<!DOCTYPE html><html lang="zh-CN"><head><meta charset="UTF-8" /><meta name="viewport" content="width=device-width, initial-scale=1.0" /><title>登录 - ${siteName}</title><link rel="stylesheet" href="styles.css" /></head><body><div class="scanline" aria-hidden="true"></div><main class="login-shell"><section class="login-card pixel-card"><p class="eyebrow">PRIVATE MEDIA HUB</p><h1>访问保护</h1><p class="hero-text">请输入 .env 中配置的 MEDIA_HUB_PASSWORD 后继续访问${siteName}。</p>${error ? `<p class="login-error">${escapeHtml(error)}</p>` : ""}<form method="post" action="/api/login" class="login-form"><input class="pixel-input" name="password" type="password" autocomplete="current-password" placeholder="访问密码" autofocus /><button class="pixel-button" type="submit">进入</button></form></section></main></body></html>`;
 }
 
 ensureDirectories();
@@ -1545,6 +1552,9 @@ fastify.post("/api/admin-unlock", async (request, reply) => {
 });
 
 fastify.get("/api/admin-status", async (request) => ok({ unlocked: hasAdminSession(request) }));
+
+// 站点配置（只读）：GET 请求不会被 isAdminRoute 判为管理路由，仅需主会话可见。
+fastify.get("/api/site-config", async () => ok({ siteName: SITE_NAME }));
 
 fastify.post("/api/view-unlock", async (request, reply) => {
   const password = String(request.body?.password || "");

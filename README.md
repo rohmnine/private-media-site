@@ -20,6 +20,7 @@
 3. **填写你自己的密码**（编辑 `.env`）：
    - `MEDIA_HUB_PASSWORD`、`MEDIA_HUB_VIEW_PASSWORD`、`MEDIA_HUB_ADMIN_PASSWORD`、`MEDIA_HUB_DIARY_PASSWORD`：四个**互不相同**的强口令，各至少 8 位；
    - `SESSION_SECRET`：用 `openssl rand -hex 32` 生成；
+   - `SITE_NAME`（可选）：自定义站点名称，显示在页面标题与页头；不填则使用默认「私人媒体站」；
    - 其余可选项见 `.env.example` 内的注释。
 
 4. **安装依赖并启动**
