@@ -18,7 +18,6 @@ const fastify = require("fastify")({ logger: true });
 const multipart = require("@fastify/multipart");
 const staticPlugin = require("@fastify/static");
 
-const PORT = Number(process.env.PORT || 8080);
 const ROOT_DIR = __dirname;
 const PUBLIC_DIR = path.join(ROOT_DIR, "public");
 const ENV_PATH = path.join(ROOT_DIR, ".env");
@@ -39,6 +38,8 @@ const DATA_DIR = resolveConfiguredDir(process.env.DATA_ROOT || "./data");
 const ASSETS_DIR = resolveConfiguredDir(process.env.MEDIA_ROOT || "./assets");
 const TRASH_DIR = resolveConfiguredDir(process.env.TRASH_ROOT || "./trash");
 const THUMB_DIR = resolveConfiguredDir(process.env.THUMB_ROOT || "./thumbnails");
+// PORT 必须在 loadEnvFile() 之后读取，否则 .env 中配置的 PORT 不会生效。
+const PORT = Number(process.env.PORT || 8080);
 const DB_PATH = path.join(DATA_DIR, "media-db.json");
 const LOGS_PATH = path.join(DATA_DIR, "logs.json");
 const BACKUP_DIR = path.join(DATA_DIR, "backups");

@@ -6,6 +6,8 @@
 > 适合：手头没有可常开的设备、愿意花少量钱换稳定 24h 在线。
 > 不想花钱、想用家里常开设备的，见 `REMOTE-ACCESS.md`。
 
+> **模板使用者请注意**：下文中的 `<your-username>`、`<你的域名>`、`<你的隧道名>`、`<本机项目路径>`、`<服务器IP>` 等尖括号占位符，请替换为你自己的实际值；尤其是把 `<your-username>/private-media-site` 换成你自己的仓库地址。
+
 ---
 
 ## 0. 选购（阿里云 / 腾讯云轻量应用服务器，支付宝付款）
@@ -30,7 +32,7 @@ ssh root@<你的服务器IP>
 把仓库里的初始化脚本跑一遍（装 Docker + 建目录）：
 ```bash
 # 在服务器上
-curl -fsSL https://raw.githubusercontent.com/rohmnine/private-media-site/main/deploy/aliyun-ecs-setup.sh -o setup.sh
+curl -fsSL https://raw.githubusercontent.com/<your-username>/private-media-site/main/deploy/aliyun-ecs-setup.sh -o setup.sh
 sudo bash setup.sh
 ```
 > 脚本会安装 Docker 与 docker compose 插件，并创建 `/opt/private-media-site` 的数据目录。
@@ -45,13 +47,13 @@ sudo bash setup.sh
 **A. 用 git 拉代码（推荐）**
 ```bash
 cd /opt
-sudo git clone https://github.com/rohmnine/private-media-site.git
+sudo git clone https://github.com/<your-username>/private-media-site.git
 cd private-media-site
 ```
 
 **B. 从本机用 scp 上传**（在你自己电脑上执行）
 ```bash
-scp -r I:\online\private-media-site root@<服务器IP>:/opt/private-media-site
+scp -r <本机项目路径> root@<服务器IP>:/opt/private-media-site
 ```
 
 ---
@@ -84,7 +86,7 @@ scp -r assets/*  root@<服务器IP>:/opt/private-media-site/assets/
 
 ## 5. 把 Cloudflare 隧道挪到服务器（复用你现有域名，无需信用卡）
 
-你之前已用 `cloudflared tunnel create museum` 建好隧道（凭据在本机 `~/.cloudflared/<隧道ID>.json`）。
+你之前已用 `cloudflared tunnel create <你的隧道名>` 建好隧道（凭据在本机 `~/.cloudflared/<隧道ID>.json`）。
 现在把它搬到服务器上跑即可，**域名不变**。
 
 1. **拷贝凭据文件到服务器**（在本机执行，Windows 用 PowerShell 的 `scp` 或 WinSCP）：
@@ -99,7 +101,7 @@ scp -r assets/*  root@<服务器IP>:/opt/private-media-site/assets/
    nano config.yml
    ```
    按注释填：`tunnel` = 你的隧道ID；`credentials-file` = `/etc/cloudflared/<隧道ID>.json`；
-   `hostname` = `museum.imacat.cc.cd`；`service` 保持 `http://private-media-hub:8080`。
+   `hostname` = `<你的域名>`；`service` 保持 `http://private-media-hub:8080`。
 3. ⚠️ **关掉本机上还在跑的同名隧道**（一个隧道同时只该在一处运行，避免冲突）。
    如果你之前在本机装了 `cloudflared service install`，先卸载：`cloudflared service uninstall`。
 
@@ -121,7 +123,7 @@ docker logs -f media-hub-tunnel     # 看到 Registered tunnel connection 即隧
 docker logs -f private-media-hub    # 看站点日志
 ```
 
-手机/异地浏览器打开 **`https://museum.imacat.cc.cd`**，输入密码即可。电脑此后可随便关机。
+手机/异地浏览器打开 **`https://<你的域名>`**，输入密码即可。电脑此后可随便关机。
 
 ---
 
