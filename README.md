@@ -7,7 +7,7 @@
 1. **克隆仓库**
 
    ```bash
-   git clone <你的仓库地址> private-media-site
+   git clone https://github.com/rohmnine/private-media-site.git
    cd private-media-site
    ```
 
