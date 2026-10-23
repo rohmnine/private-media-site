@@ -18,7 +18,11 @@
    ```
 
 3. **填写你自己的密码**（编辑 `.env`）：
-   - `MEDIA_HUB_PASSWORD`、`MEDIA_HUB_VIEW_PASSWORD`、`MEDIA_HUB_ADMIN_PASSWORD`、`MEDIA_HUB_DIARY_PASSWORD`：四个**互不相同**的强口令，各至少 8 位；
+   - `MEDIA_HUB_PASSWORD`、`MEDIA_HUB_VIEW_PASSWORD`、`MEDIA_HUB_ADMIN_PASSWORD`、`MEDIA_HUB_DIARY_PASSWORD`：四个**互不相同**的强口令，需同时满足：
+     - 至少 **8 位**；
+     - **不能是纯数字**（如 `12345612`、`20261023` 会被拒绝）；
+     - 不能以 `change_me` / `replace_with` / `password` 开头（属于占位符模式）；
+     - 不能是单字符重复（如 `aaaaaaaa`）；
    - `SESSION_SECRET`：用 `openssl rand -hex 32` 生成；
    - `SITE_NAME`（可选）：自定义站点名称，显示在页面标题与页头；不填则使用默认「私人媒体站」；
    - 其余可选项见 `.env.example` 内的注释。
@@ -373,6 +377,38 @@ npm start
 ### 启动时报"缺少必需的环境变量"怎么办？
 
 说明 `.env` 未创建或缺少必填项。请执行 `cp .env.example .env`，填好四个密码与 `SESSION_SECRET` 后重启。
+
+### 启动时报"仍是占位符/弱口令"怎么办？
+
+报错形如：
+
+```text
+Error: 环境变量 MEDIA_HUB_PASSWORD 仍是占位符/弱口令，请修改为真实随机值。
+```
+
+说明你的口令没通过启动校验。校验规则如下：
+
+| 检查项 | 要求 | 会被拒绝的例子 |
+|---|---|---|
+| 长度 | 密码 ≥ 8 位；`SESSION_SECRET` ≥ 32 位 | `abc123` |
+| 纯数字 | 不允许全是数字 | `12345612`、`20261023` |
+| 占位符前缀 | 不能以 `change_me` / `replace_with` / `password` 开头 | `CHANGE_ME_ACCESS_PASSWORD` |
+| 单字符重复 | 不能是同一个字符重复 | `aaaaaaaa` |
+| 互不相同 | 四个 `MEDIA_HUB_*_PASSWORD` 必须两两不同 | 四个都填 `MyPass123` |
+
+生成随机口令（任选一种）：
+
+```bash
+# Git Bash / Linux / macOS
+openssl rand -hex 16
+
+# 只有 Node 也可以
+node -e "console.log(require('crypto').randomBytes(16).toString('hex'))"
+```
+
+也可以用好记但满足规则的组合，例如 `Coffee-Museum-2026`、`blue.river.4821` —— 不必是纯随机串，只要含字母和数字、够 8 位、不是纯数字即可。
+
+> 改完 `.env` 后需重启 `npm start` 才会生效。四个密码互不相同且都是随机串时，建议立即存入密码管理器。
 
 ### 为什么上传登记后刷新没有保存？
 
