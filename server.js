@@ -51,7 +51,17 @@ const PHOTO_DIR = path.join(ASSETS_DIR, "photos");
 const AUDIO_DIR = path.join(ASSETS_DIR, "audio");
 const BOOK_DIR = path.join(ASSETS_DIR, "books");
 // —— 必填环境变量读取：缺失/过短/仍是占位符一律拒绝启动，绝不回退默认值 ——
-function requireEnv(name, { minLength = 1 } = {}) {
+// 内网宽松模式：仅适合本机 / 可信局域网。开启后允许 6 位口令与纯数字口令，
+// 但常见弱口令（如 123456）仍会被拒绝。公网部署请勿开启。
+const LAN_MODE = String(process.env.MEDIA_HUB_LAN_MODE || "false").toLowerCase() === "true";
+const PASSWORD_MIN_LENGTH = LAN_MODE ? 6 : 8;
+const COMMON_WEAK_PASSWORDS = new Set([
+  "123456", "1234567", "12345678", "123456789", "1234567890",
+  "000000", "111111", "666666", "888888", "999999",
+  "qwerty", "abc123", "iloveyou", "admin", "password"
+]);
+
+function requireEnv(name, { minLength = 1, allowAllDigits = false } = {}) {
   const value = String(process.env[name] || "").trim();
   if (!value) {
     throw new Error(
@@ -61,23 +71,29 @@ function requireEnv(name, { minLength = 1 } = {}) {
   if (value.length < minLength) {
     throw new Error(`环境变量 ${name} 过短：至少需要 ${minLength} 个字符。`);
   }
-  // 占位符 / 弱口令检测（不写死任何具体口令字面量）：
+  // 占位符 / 弱口令检测：
   //  - 占位符前缀（change*me / replace*with / password）
-  //  - 纯数字（旧默认口令即 6 位纯数字；如 123456、12345612 等一律拒绝）
+  //  - 纯数字（默认拒绝；内网宽松模式下允许）
   //  - 单字符重复（如 aaaaaaaa）
+  //  - 常见弱口令（即使在内网宽松模式下也拒绝）
   const isPlaceholder = /^(change[-_]?me|replace[-_]?with|password)/i.test(value);
   const isAllDigits = /^\d+$/.test(value);
   const isSingleRepeatedChar = /^(.)\1+$/.test(value);
-  if (isPlaceholder || isAllDigits || isSingleRepeatedChar) {
-    throw new Error(`环境变量 ${name} 仍是占位符/弱口令，请修改为真实随机值。`);
+  const isCommonWeak = COMMON_WEAK_PASSWORDS.has(value.toLowerCase());
+  const rejectsDigits = isAllDigits && !allowAllDigits;
+  if (isPlaceholder || rejectsDigits || isSingleRepeatedChar || isCommonWeak) {
+    const digitHint = rejectsDigits
+      ? "（当前不允许纯数字口令；如确属内网使用，可设置 MEDIA_HUB_LAN_MODE=true 放宽）"
+      : "";
+    throw new Error(`环境变量 ${name} 仍是占位符/弱口令，请修改为真实随机值。${digitHint}`);
   }
   return value;
 }
 
-const MEDIA_HUB_PASSWORD = requireEnv("MEDIA_HUB_PASSWORD", { minLength: 8 });
-const MEDIA_HUB_VIEW_PASSWORD = requireEnv("MEDIA_HUB_VIEW_PASSWORD", { minLength: 8 });
-const MEDIA_HUB_ADMIN_PASSWORD = requireEnv("MEDIA_HUB_ADMIN_PASSWORD", { minLength: 8 });
-const MEDIA_HUB_DIARY_PASSWORD = requireEnv("MEDIA_HUB_DIARY_PASSWORD", { minLength: 8 });
+const MEDIA_HUB_PASSWORD = requireEnv("MEDIA_HUB_PASSWORD", { minLength: PASSWORD_MIN_LENGTH, allowAllDigits: LAN_MODE });
+const MEDIA_HUB_VIEW_PASSWORD = requireEnv("MEDIA_HUB_VIEW_PASSWORD", { minLength: PASSWORD_MIN_LENGTH, allowAllDigits: LAN_MODE });
+const MEDIA_HUB_ADMIN_PASSWORD = requireEnv("MEDIA_HUB_ADMIN_PASSWORD", { minLength: PASSWORD_MIN_LENGTH, allowAllDigits: LAN_MODE });
+const MEDIA_HUB_DIARY_PASSWORD = requireEnv("MEDIA_HUB_DIARY_PASSWORD", { minLength: PASSWORD_MIN_LENGTH, allowAllDigits: LAN_MODE });
 const SESSION_SECRET = requireEnv("SESSION_SECRET", { minLength: 32 });
 
 // 额外护栏：会话密钥不得是单字符重复 / 常见弱值
@@ -100,6 +116,14 @@ if (MEDIA_HUB_VIEW_PASSWORD === MEDIA_HUB_PASSWORD || MEDIA_HUB_ADMIN_PASSWORD =
 }
 if (MEDIA_HUB_DIARY_PASSWORD === MEDIA_HUB_PASSWORD) {
   throw new Error("MEDIA_HUB_DIARY_PASSWORD 必须与 MEDIA_HUB_PASSWORD 不一致");
+}
+
+if (LAN_MODE) {
+  console.warn("");
+  console.warn("  [!] 内网宽松模式已开启（MEDIA_HUB_LAN_MODE=true）");
+  console.warn("      口令可为 6 位纯数字，仅适合本机或可信局域网。");
+  console.warn("      请勿在公网环境开启此选项。");
+  console.warn("");
 }
 
 const mediaTypes = {
