@@ -25,3 +25,6 @@ node_modules/
 # 个人杂项
 links_to_check.txt
 links_to_check*.txt
+
+# 本地公网启动脚本（含个人域名，不对外发布）
+start-public.bat
