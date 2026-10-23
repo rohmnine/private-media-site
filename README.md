@@ -11,13 +11,21 @@
    cd private-media-site
    ```
 
-2. **创建配置文件**
+2. **安装依赖**
 
    ```bash
-   cp .env.example .env
+   npm install
    ```
 
-3. **填写你自己的密码**（编辑 `.env`）：
+3. **生成密码**（推荐，一条命令搞定）
+
+   ```bash
+   npm run init
+   ```
+
+   脚本会生成四个互不相同的随机密码和会话密钥，打印出来并写入 `.env`。**把打印结果存好**，不需要自己设计密码。
+
+   想手动指定密码也可以，直接编辑 `.env`，规则见下方「密码规则」：
    - `MEDIA_HUB_PASSWORD`、`MEDIA_HUB_VIEW_PASSWORD`、`MEDIA_HUB_ADMIN_PASSWORD`、`MEDIA_HUB_DIARY_PASSWORD`：四个**互不相同**的强口令，需同时满足：
      - 至少 **8 位**；
      - **不能是纯数字**（如 `12345612`、`20261023` 会被拒绝）；
@@ -27,10 +35,9 @@
    - `SITE_NAME`（可选）：自定义站点名称，显示在页面标题与页头；不填则使用默认「私人媒体站」；
    - 其余可选项见 `.env.example` 内的注释。
 
-4. **安装依赖并启动**
+4. **启动服务**
 
    ```bash
-   npm install
    npm start
    ```
 
@@ -272,13 +279,13 @@ thumbnails/
 npm install
 ```
 
-在项目根目录创建配置文件（**请勿把真实 `.env` 提交到版本库**）：
+在项目根目录生成配置文件（**请勿把真实 `.env` 提交到版本库**）：
 
 ```bash
-cp .env.example .env
+npm run init
 ```
 
-然后编辑 `.env` 填入你自己的强口令。全部可用变量与说明见 [`.env.example`](.env.example)，关键项如下：
+脚本会自动生成随机强口令并写入 `.env`。想手动指定则改为 `cp .env.example .env` 后编辑。全部可用变量与说明见 [`.env.example`](.env.example)，关键项如下：
 
 ```env
 MEDIA_HUB_PASSWORD=CHANGE_ME_ACCESS_PASSWORD
@@ -376,11 +383,13 @@ npm start
 
 ### 启动时报"缺少必需的环境变量"怎么办？
 
-说明 `.env` 未创建或缺少必填项。请执行 `cp .env.example .env`，填好四个密码与 `SESSION_SECRET` 后重启。
+说明 `.env` 未创建或缺少必填项。请执行 `npm run init` 自动生成，或 `cp .env.example .env` 后手动填写四个密码与 `SESSION_SECRET`，再重启。
 
 ### 启动时报"仍是占位符/弱口令"怎么办？
 
-报错形如：
+**最省事的办法**：执行 `npm run init -- --force`，脚本会重新生成一份合规配置并打印新密码。
+
+如果你想自己设密码，报错形如：
 
 ```text
 Error: 环境变量 MEDIA_HUB_PASSWORD 仍是占位符/弱口令，请修改为真实随机值。
